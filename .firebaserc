@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.firebase/
+.env
+.env.local
+.env.production
+packs.db
