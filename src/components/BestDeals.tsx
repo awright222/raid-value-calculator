@@ -34,20 +34,32 @@ export default function BestDeals() {
       packs.forEach(pack => {
         if (!pack.items || pack.items.length === 0) return;
         
-        const totalItems = pack.items.reduce((sum, item) => sum + item.quantity, 0);
-        
-        pack.items.forEach(item => {
+        // If pack has only one item type, use full pack price
+        if (pack.items.length === 1) {
+          const item = pack.items[0];
           if (!itemStats[item.itemTypeId]) {
             itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0 };
           }
           
-          // Proportional cost allocation
-          const itemProportion = item.quantity / totalItems;
-          const itemCost = pack.price * itemProportion;
-          
-          itemStats[item.itemTypeId].totalCost += itemCost;
+          itemStats[item.itemTypeId].totalCost += pack.price;
           itemStats[item.itemTypeId].totalQuantity += item.quantity;
-        });
+        } else {
+          // For multi-item packs, use proportional allocation
+          const totalItems = pack.items.reduce((sum, item) => sum + item.quantity, 0);
+          
+          pack.items.forEach(item => {
+            if (!itemStats[item.itemTypeId]) {
+              itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0 };
+            }
+            
+            // Proportional cost allocation
+            const itemProportion = item.quantity / totalItems;
+            const itemCost = pack.price * itemProportion;
+            
+            itemStats[item.itemTypeId].totalCost += itemCost;
+            itemStats[item.itemTypeId].totalQuantity += item.quantity;
+          });
+        }
       });
 
       // Calculate average prices per item
