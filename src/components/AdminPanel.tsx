@@ -61,7 +61,6 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const packs = await getPendingPacks();
       setPendingPacks(packs);
     } catch (error) {
-      console.error('Error loading pending packs:', error);
       setError('Failed to load pending packs');
     } finally {
       setModerationLoading(false);
@@ -124,13 +123,6 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const totalEnergy = energyPots * 130 + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(formData.price) / totalEnergy : 0;
       
-      console.log('🚀 Starting pack submission:', {
-        name: formData.name,
-        price: parseFloat(formData.price),
-        validItems: validItems.length,
-        totalEnergy
-      });
-      
       // Use enhanced validation
       const result = await addPackWithValidation({
         name: formData.name,
@@ -145,18 +137,11 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
         })),
       });
 
-      console.log('✅ Pack submission successful:', result);
-
       // Show validation results
       if (result.warnings.length > 0) {
         setValidationWarnings(result.warnings);
-        console.log('⚠️ Pack validation warnings:', result.warnings);
       }
       
-      if (result.suggestions.length > 0) {
-        console.log('💡 Pack validation suggestions:', result.suggestions);
-      }
-
       setSuccess(`Pack "${formData.name}" added successfully!` + 
         (result.warnings.length > 0 ? ' (See warnings below)' : ''));
       
@@ -166,7 +151,6 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       onPackAdded();
       
     } catch (error: any) {
-      console.error('❌ Error adding pack:', error);
       const errorMessage = error?.message || 'Failed to add pack. Please try again.';
       setError(`Failed to add pack: ${errorMessage}`);
     } finally {
@@ -251,7 +235,6 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
 
         successCount++;
       } catch (error) {
-        console.error('Error importing pack:', pack.name, error);
         errorCount++;
       }
     }
@@ -275,7 +258,6 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
         setError('Failed to approve pack');
       }
     } catch (error) {
-      console.error('Error approving pack:', error);
       setError('Failed to approve pack');
     }
   };
@@ -291,7 +273,6 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       });
       setSuccess(`Cleaned up ${cleanedCount} expired packs`);
     } catch (error) {
-      console.error('Error cleaning up:', error);
       setError('Failed to cleanup expired packs');
     } finally {
       setLoading(false);

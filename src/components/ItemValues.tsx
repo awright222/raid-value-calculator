@@ -51,14 +51,6 @@ export default function ItemValues() {
         };
       }).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
-      console.log('Final item values calculated:', values.length, 'items');
-      console.log('Items with highest confidence (most pack data):');
-      const topConfidenceItems = values
-        .sort((a, b) => b.packCount - a.packCount)
-        .slice(0, 5)
-        .map(item => `${item.itemName}: $${item.averagePrice.toFixed(4)} (${item.packCount} packs)`);
-      console.log(topConfidenceItems);
-
       setItemValues(values);
       setLastUpdated(new Date());
       
@@ -76,12 +68,12 @@ export default function ItemValues() {
         });
         
         await savePriceSnapshot(priceData);
-        console.log('📈 Historical price snapshot saved');
+        // Historical price snapshot saved
       } catch (error) {
-        console.error('Failed to save price snapshot:', error);
+        // Save failed silently
       }
     } catch (error) {
-      console.error('Error loading item values:', error);
+      // Error handled gracefully
     } finally {
       setLoading(false);
       setRefreshing(false);

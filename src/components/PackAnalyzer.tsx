@@ -52,7 +52,6 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       
       // Use the shared pricing service that has the advanced algorithm
       const { itemPrices, itemStats } = await calculateItemPrices(isRefresh);
-      console.log('PackAnalyzer: Loaded prices for', Object.keys(itemPrices).length, 'item types');
       
       setItemPrices(itemPrices);
       
@@ -67,7 +66,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       setItemStats(statsForConfidence);
       setLastDataUpdate(new Date());
     } catch (error) {
-      console.error('Error loading item prices:', error);
+      // Error handled gracefully
     } finally {
       setRefreshing(false);
     }
@@ -117,9 +116,6 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       const itemType = getItemTypeById(item.itemTypeId);
       const pricePerItem = itemPrices[item.itemTypeId] || 0;
       const itemMarketValue = item.quantity * pricePerItem;
-      
-      // Debug logging for value calculations
-      console.log(`📊 Item Breakdown: ${item.quantity}x ${itemType?.name || item.itemTypeId} = $${itemMarketValue.toFixed(2)} (unit price: $${pricePerItem.toFixed(6)})`);
       
       totalMarketValue += itemMarketValue;
       
@@ -261,9 +257,9 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
           }),
           analysisDate: Timestamp.now()
         });
-        console.log('📊 Pack analysis saved to history');
+        // Analysis saved successfully
       } catch (error) {
-        console.error('Failed to save pack analysis:', error);
+        // Save failed silently
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
