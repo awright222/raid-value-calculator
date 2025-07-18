@@ -19,8 +19,11 @@ service cloud.firestore {
     // Public read access to packs (anyone can view pack data)
     match /packs/{packId} {
       allow read: if true;
-      // Temporarily very permissive for cache issues
-      allow write: if true;
+      // Refined validation that works with our pack structure
+      allow write: if request.resource.data.name is string &&
+                      request.resource.data.price is number &&
+                      request.resource.data.price > 0 &&
+                      isWithinRateLimit();
     }
     
     // Historical data - controlled writes
