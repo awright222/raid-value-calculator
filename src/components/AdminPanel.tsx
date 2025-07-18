@@ -1,23 +1,69 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, calculatePackValue, type PackItem } from '../types/itemTypes';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { addPack } from '../firebase/database';
+import { getPendingPacks, approvePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
+import type { PendingPack } from '../utils/duplicateDetection';
 
 interface AdminPanelProps {
   onPackAdded: () => void;
-  // Remove authToken since Firebase handles auth differently
 }
 
-export default function AdminPanel({ onPackAdded }: AdminPanelProps) {
+function AdminPanel({ onPackAdded }: AdminPanelProps) {
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance'>('moderate');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
+
+  // Single pack form state
   const [formData, setFormData] = useState({
     name: '',
     price: '',
   });
   const [packItems, setPackItems] = useState<PackItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
 
+  // Bulk import state
+  const [bulkData, setBulkData] = useState('');
+  const [bulkPreview, setBulkPreview] = useState<any[]>([]);
+
+  // Moderation state
+  const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([]);
+  const [moderationLoading, setModerationLoading] = useState(false);
+
+  // Maintenance state
+  const [maintenanceStats, setMaintenanceStats] = useState({
+    expiredCleaned: 0,
+    lastCleanup: null as Date | null
+  });
+
+  const adminTabs = [
+    { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
+    { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
+    { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
+    { id: 'maintenance', label: 'Maintenance', icon: '🔧', description: 'System cleanup' }
+  ] as const;
+
+  // Load pending packs for moderation
+  useEffect(() => {
+    if (activeAdminTab === 'moderate') {
+      loadPendingPacks();
+    }
+  }, [activeAdminTab]);
+
+  const loadPendingPacks = async () => {
+    setModerationLoading(true);
+    try {
+      const packs = await getPendingPacks();
+      setPendingPacks(packs);
+    } catch (error) {
+      console.error('Error loading pending packs:', error);
+      setError('Failed to load pending packs');
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Single pack functions
   const addItem = () => {
     setPackItems([...packItems, { itemTypeId: '', quantity: 0 }]);
   };
@@ -32,7 +78,7 @@ export default function AdminPanel({ onPackAdded }: AdminPanelProps) {
     setPackItems(updatedItems);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSinglePackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.price) {
@@ -45,31 +91,34 @@ export default function AdminPanel({ onPackAdded }: AdminPanelProps) {
       return;
     }
 
-    // Validate all items have valid types and quantities
     const validItems = packItems.filter(item => item.itemTypeId && item.quantity > 0);
     if (validItems.length === 0) {
-      setError('At least one item with valid type and quantity > 0 is required');
+      setError('At least one item must have a valid type and quantity > 0');
       return;
     }
 
     setLoading(true);
     setError('');
-    setSuccess('');
 
     try {
-      // Calculate energy values for backward compatibility
-      const energyPots = packItems
-        .filter(item => item.itemTypeId === 'energy_pot')
-        .reduce((sum, item) => sum + item.quantity, 0);
+      // Remove unused packValue calculation
       
-      const rawEnergy = packItems
-        .filter(item => item.itemTypeId === 'raw_energy')
-        .reduce((sum, item) => sum + item.quantity, 0);
-
-      const totalEnergy = (energyPots * 130) + rawEnergy;
+      // Calculate energy from items
+      let energyPots = 0;
+      let rawEnergy = 0;
+      
+      validItems.forEach(item => {
+        const itemType = getItemTypeById(item.itemTypeId);
+        if (itemType?.id === 'energy_pot') {
+          energyPots += item.quantity;
+        } else if (itemType?.id === 'raw_energy') {
+          rawEnergy += item.quantity;
+        }
+      });
+      
+      const totalEnergy = energyPots * 130 + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(formData.price) / totalEnergy : 0;
-
-      // Add pack to Firebase
+      
       await addPack({
         name: formData.name,
         price: parseFloat(formData.price),
@@ -77,282 +126,565 @@ export default function AdminPanel({ onPackAdded }: AdminPanelProps) {
         raw_energy: rawEnergy,
         total_energy: totalEnergy,
         cost_per_energy: costPerEnergy,
-        items: packItems.filter(item => item.itemTypeId && item.quantity > 0)
+        items: validItems.map(item => ({
+          itemTypeId: item.itemTypeId,
+          quantity: item.quantity,
+        })),
       });
 
       setSuccess('Pack added successfully!');
       setFormData({ name: '', price: '' });
       setPackItems([]);
       onPackAdded();
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (error) {
+      console.error('Error adding pack:', error);
+      setError('Failed to add pack. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData) => (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+  // Bulk import functions
+  const handleBulkPreview = () => {
+    try {
+      const lines = bulkData.trim().split('\n');
+      const preview = lines.map((line, index) => {
+        const [name, price, ...itemData] = line.split(',').map(s => s.trim());
+        const items = [];
+        
+        for (let i = 0; i < itemData.length; i += 2) {
+          if (itemData[i] && itemData[i + 1]) {
+            items.push({
+              itemTypeId: itemData[i],
+              quantity: parseInt(itemData[i + 1]) || 0
+            });
+          }
+        }
+
+        return {
+          line: index + 1,
+          name,
+          price: parseFloat(price) || 0,
+          items,
+          isValid: name && price && items.length > 0
+        };
+      });
+
+      setBulkPreview(preview);
+    } catch (error) {
+      setError('Invalid CSV format');
+    }
   };
 
-  const calculatePreview = () => {
-    const valueAnalysis = calculatePackValue(packItems);
-    const price = parseFloat(formData.price) || 0;
-    
-    return {
-      totalEnergyEquivalent: valueAnalysis.totalEnergyEquivalent,
-      totalMarketValue: valueAnalysis.totalMarketValue,
-      valueVsMarket: price > 0 ? valueAnalysis.totalMarketValue / price : 0,
-      discountPercent: price > 0 ? ((valueAnalysis.totalMarketValue - price) / valueAnalysis.totalMarketValue) * 100 : 0
-    };
+  const handleBulkImport = async () => {
+    if (bulkPreview.length === 0) {
+      setError('Please preview data first');
+      return;
+    }
+
+    setLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const pack of bulkPreview) {
+      if (!pack.isValid) {
+        errorCount++;
+        continue;
+      }
+
+      try {
+        // Calculate energy from items
+        let energyPots = 0;
+        let rawEnergy = 0;
+        
+        pack.items.forEach((item: any) => {
+          const itemType = getItemTypeById(item.itemTypeId);
+          if (itemType?.id === 'energy_pot') {
+            energyPots += item.quantity;
+          } else if (itemType?.id === 'raw_energy') {
+            rawEnergy += item.quantity;
+          }
+        });
+        
+        const totalEnergy = energyPots * 130 + rawEnergy;
+        const costPerEnergy = totalEnergy > 0 ? pack.price / totalEnergy : 0;
+        
+        await addPack({
+          name: pack.name,
+          price: pack.price,
+          energy_pots: energyPots,
+          raw_energy: rawEnergy,
+          total_energy: totalEnergy,
+          cost_per_energy: costPerEnergy,
+          items: pack.items,
+        });
+
+        successCount++;
+      } catch (error) {
+        console.error('Error importing pack:', pack.name, error);
+        errorCount++;
+      }
+    }
+
+    setLoading(false);
+    setSuccess(`Import complete: ${successCount} successful, ${errorCount} failed`);
+    setBulkData('');
+    setBulkPreview([]);
+    onPackAdded();
   };
 
-  const preview = calculatePreview();
+  // Moderation functions
+  const handleApprovePack = async (packId: string) => {
+    try {
+      const success = await approvePendingPack(packId);
+      if (success) {
+        setSuccess('Pack approved successfully!');
+        await loadPendingPacks();
+        onPackAdded();
+      } else {
+        setError('Failed to approve pack');
+      }
+    } catch (error) {
+      console.error('Error approving pack:', error);
+      setError('Failed to approve pack');
+    }
+  };
+
+  // Maintenance functions
+  const handleCleanupExpired = async () => {
+    setLoading(true);
+    try {
+      const cleanedCount = await cleanupExpiredPacks();
+      setMaintenanceStats({
+        expiredCleaned: cleanedCount,
+        lastCleanup: new Date()
+      });
+      setSuccess(`Cleaned up ${cleanedCount} expired packs`);
+    } catch (error) {
+      console.error('Error cleaning up:', error);
+      setError('Failed to cleanup expired packs');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="space-y-6">
+      {/* Global Messages */}
+      <AnimatePresence>
+        {(success || error) && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`p-4 rounded-xl ${
+              success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <span>{success || error}</span>
+              <button
+                onClick={() => { setSuccess(''); setError(''); }}
+                className="text-current opacity-70 hover:opacity-100 ml-4"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Admin Tab Navigation */}
+      <div className="flex justify-center">
+        <div className="glass-effect rounded-2xl p-2 shadow-xl">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {adminTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveAdminTab(tab.id)}
+                className={`relative px-4 py-3 rounded-xl font-medium transition-all duration-300 text-center ${
+                  activeAdminTab === tab.id
+                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-lg'
+                    : 'text-secondary-600 hover:bg-white/50 hover:text-primary-600'
+                }`}
+              >
+                <div className="flex flex-col items-center space-y-1">
+                  <span className="text-lg">{tab.icon}</span>
+                  <div className="text-sm font-semibold">{tab.label}</div>
+                  <div className="text-xs opacity-75">{tab.description}</div>
+                </div>
+                {activeAdminTab === tab.id && (
+                  <motion.div
+                    layoutId="activeAdminTab"
+                    className="absolute inset-0 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl -z-10"
+                    initial={false}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Content */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="card p-8"
+        key={activeAdminTab}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.3 }}
       >
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Add New Pack</h2>
-        
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Pack Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={handleInputChange('name')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                placeholder="e.g., Premium Energy Bundle"
-                required
-              />
+        {/* Moderation Tab */}
+        {activeAdminTab === 'moderate' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Community Moderation
+              </h2>
+              <p className="text-secondary-600">
+                Review and approve pending pack submissions
+              </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Price ($) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.price}
-                onChange={handleInputChange('price')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                placeholder="9.99"
-                required
-              />
+            {moderationLoading ? (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-secondary-600">Loading pending packs...</p>
+              </div>
+            ) : pendingPacks.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">✅</div>
+                <h3 className="text-xl font-semibold text-secondary-700 mb-2">All caught up!</h3>
+                <p className="text-secondary-600">No pending packs require moderation.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingPacks.map((pack) => (
+                  <div key={pack.id} className="bg-white rounded-xl p-6 border border-gray-200">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-secondary-800 mb-2">{pack.name}</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                          <div>
+                            <span className="text-secondary-500">Price:</span>
+                            <div className="font-semibold">${pack.price}</div>
+                          </div>
+                          <div>
+                            <span className="text-secondary-500">Energy:</span>
+                            <div className="font-semibold">{pack.total_energy.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-secondary-500">Confirmations:</span>
+                            <div className="font-semibold">{pack.confirmation_count}/3</div>
+                          </div>
+                          <div>
+                            <span className="text-secondary-500">Submitted:</span>
+                            <div className="font-semibold">{pack.submitted_at.toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        {pack.items && pack.items.length > 0 && (
+                          <div>
+                            <span className="text-secondary-500 text-sm">Items:</span>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {pack.items.map((item, index) => (
+                                <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded text-xs">
+                                  {item.itemTypeId}: {item.quantity}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleApprovePack(pack.id!)}
+                        className="ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Approve Now
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="text-center mt-6">
+              <button
+                onClick={loadPendingPacks}
+                className="px-6 py-3 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Single Pack Tab */}
+        {activeAdminTab === 'single' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Quick Add Pack
+              </h2>
+              <p className="text-secondary-600">
+                Instantly add a pack without community confirmation
+              </p>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <label className="block text-sm font-medium text-gray-700">
-                  Pack Contents *
-                </label>
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="bg-primary-500 hover:bg-primary-600 text-white px-3 py-1 rounded-lg text-sm transition-colors"
-                >
-                  + Add Item
-                </button>
+            <form onSubmit={handleSinglePackSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-2">
+                    Pack Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    placeholder="e.g., Energy Mega Pack"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-2">
+                    Price (USD) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    placeholder="9.99"
+                    required
+                  />
+                </div>
               </div>
 
-              {packItems.length === 0 && (
-                <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-                  <p>No items added yet. Click "Add Item" to start building your pack.</p>
+              {/* Items Section */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <label className="block text-sm font-medium text-secondary-700">
+                    Pack Items *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                  >
+                    + Add Item
+                  </button>
                 </div>
-              )}
 
-              <div className="space-y-3">
                 {packItems.map((item, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-4 border border-gray-200 rounded-lg bg-gray-50"
+                    className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 p-4 bg-gray-50 rounded-xl"
                   >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Item Type
-                        </label>
-                        <select
-                          value={item.itemTypeId}
-                          onChange={(e) => updateItem(index, 'itemTypeId', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
-                        >
-                          <option value="">Select item...</option>
-                          {Object.values(ITEM_CATEGORIES).map(category => (
-                            <optgroup key={category} label={category}>
-                              {getItemTypesByCategory(category).map(itemType => (
-                                <option key={itemType.id} value={itemType.id}>
-                                  {itemType.name}
-                                </option>
-                              ))}
-                            </optgroup>
+                    <select
+                      value={item.itemTypeId}
+                      onChange={(e) => updateItem(index, 'itemTypeId', e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    >
+                      <option value="">Select item type</option>
+                      {Object.entries(ITEM_CATEGORIES).map(([categoryKey, categoryName]) => (
+                        <optgroup key={categoryKey} label={categoryName}>
+                          {getItemTypesByCategory(categoryName).map(itemType => (
+                            <option key={itemType.id} value={itemType.id}>
+                              {itemType.name}
+                            </option>
                           ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Quantity
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-gray-500 flex-1 mr-2">
-                          {item.itemTypeId && getItemTypeById(item.itemTypeId)?.description}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                          title="Remove item"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
+                        </optgroup>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity || ''}
+                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                      placeholder="Quantity"
+                      className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+
+                    <div className="text-sm text-secondary-600 flex items-center">
+                      {item.itemTypeId && getItemTypeById(item.itemTypeId)?.baseValue && (
+                        <span>
+                          {item.quantity * (getItemTypeById(item.itemTypeId)?.baseValue || 0)} energy
+                        </span>
+                      )}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                    >
+                      Remove
+                    </button>
                   </motion.div>
                 ))}
               </div>
+
+              <motion.button
+                type="submit"
+                disabled={loading}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`w-full py-4 rounded-xl font-semibold text-white transition-all ${
+                  loading
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {loading ? 'Adding Pack...' : 'Add Pack Instantly'}
+              </motion.button>
+            </form>
+          </div>
+        )}
+
+        {/* Bulk Import Tab */}
+        {activeAdminTab === 'bulk' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Bulk Import
+              </h2>
+              <p className="text-secondary-600">
+                Import multiple packs from CSV data
+              </p>
             </div>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"
-              >
-                {error}
-              </motion.div>
-            )}
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-2">
+                  CSV Data
+                </label>
+                <textarea
+                  value={bulkData}
+                  onChange={(e) => setBulkData(e.target.value)}
+                  placeholder="Pack Name, Price, ItemType1, Quantity1, ItemType2, Quantity2, ...&#10;Energy Pack, 9.99, energy_pot, 5, raw_energy, 100&#10;Starter Bundle, 4.99, silver, 100000, mystery_shard, 3"
+                  className="w-full h-32 px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all font-mono text-sm"
+                />
+                <p className="text-xs text-secondary-500 mt-1">
+                  Format: Pack Name, Price, ItemType1, Quantity1, ItemType2, Quantity2, ...
+                </p>
+              </div>
 
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg"
-              >
-                {success}
-              </motion.div>
-            )}
+              <div className="flex space-x-4">
+                <button
+                  onClick={handleBulkPreview}
+                  className="px-6 py-3 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 transition-colors"
+                >
+                  Preview
+                </button>
+                {bulkPreview.length > 0 && (
+                  <button
+                    onClick={handleBulkImport}
+                    disabled={loading}
+                    className={`px-6 py-3 rounded-lg font-medium transition-all ${
+                      loading
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-primary-600 text-white hover:bg-primary-700'
+                    }`}
+                  >
+                    {loading ? 'Importing...' : 'Import All'}
+                  </button>
+                )}
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Adding Pack...' : 'Add Pack'}
-            </button>
-          </form>
-
-          {/* Preview */}
-          <div className="space-y-6">
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview</h3>
-              
-              {formData.name && (
-                <div className="bg-white rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-gray-900">{formData.name}</h4>
-                  {formData.price && (
-                    <p className="text-lg font-bold text-primary-600">${formData.price}</p>
-                  )}
-                </div>
-              )}
-
-              {packItems.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Items</h4>
-                  <div className="space-y-2">
-                    {packItems.map((item, index) => {
-                      const itemType = getItemTypeById(item.itemTypeId);
-                      return itemType && item.quantity > 0 ? (
-                        <div key={index} className="bg-white rounded-lg p-3 flex justify-between items-center">
-                          <div>
-                            <span className="font-medium text-gray-900">{item.quantity}x {itemType.name}</span>
-                            <span className="text-sm text-gray-500 ml-2">({itemType.category})</span>
-                          </div>
-                          {itemType.marketValue && (
-                            <span className="text-sm font-medium text-gray-700">
-                              ${(item.quantity * itemType.marketValue).toFixed(2)}
-                            </span>
-                          )}
+              {bulkPreview.length > 0 && (
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h3 className="text-lg font-semibold mb-4">Preview ({bulkPreview.length} packs)</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {bulkPreview.map((pack, index) => (
+                      <div key={index} className={`p-3 rounded-lg ${pack.isValid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{pack.name || 'Invalid Name'}</span>
+                          <span className={pack.isValid ? 'text-green-600' : 'text-red-600'}>
+                            ${pack.price || 0} - {pack.items?.length || 0} items
+                          </span>
                         </div>
-                      ) : null;
-                    })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white rounded-lg p-4">
-                  <p className="text-sm text-gray-600">Market Value</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    ${preview.totalMarketValue.toFixed(2)}
-                  </p>
+        {/* Maintenance Tab */}
+        {activeAdminTab === 'maintenance' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                System Maintenance
+              </h2>
+              <p className="text-secondary-600">
+                Database cleanup and system operations
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cleanup Operations */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <span className="mr-2">🧹</span>
+                  Database Cleanup
+                </h3>
+                
+                <div className="space-y-4">
+                  <button
+                    onClick={handleCleanupExpired}
+                    disabled={loading}
+                    className={`w-full py-3 rounded-lg font-medium transition-all ${
+                      loading
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                  >
+                    {loading ? 'Cleaning...' : 'Clean Expired Packs'}
+                  </button>
+
+                  {maintenanceStats.lastCleanup && (
+                    <div className="text-sm text-secondary-600">
+                      <p>Last cleanup: {maintenanceStats.lastCleanup.toLocaleString()}</p>
+                      <p>Expired packs removed: {maintenanceStats.expiredCleaned}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="bg-white rounded-lg p-4">
-                  <p className="text-sm text-gray-600">Value Ratio</p>
-                  <p className={`text-xl font-bold ${
-                    preview.valueVsMarket > 1.2 ? 'text-green-600' :
-                    preview.valueVsMarket > 1.0 ? 'text-yellow-600' :
-                    'text-red-600'
-                  }`}>
-                    {preview.valueVsMarket > 0 ? `${preview.valueVsMarket.toFixed(2)}x` : '--'}
-                  </p>
-                </div>
-                <div className="bg-white rounded-lg p-4">
-                  <p className="text-sm text-gray-600">Energy Equivalent</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    {preview.totalEnergyEquivalent.toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-white rounded-lg p-4">
-                  <p className="text-sm text-gray-600">Discount</p>
-                  <p className={`text-xl font-bold ${
-                    preview.discountPercent > 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {preview.discountPercent !== 0 ? 
-                      `${preview.discountPercent > 0 ? '+' : ''}${preview.discountPercent.toFixed(1)}%` : '--'}
-                  </p>
+              </div>
+
+              {/* System Stats */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <span className="mr-2">📊</span>
+                  System Statistics
+                </h3>
+                
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-secondary-600">Pending Packs:</span>
+                    <span className="font-semibold">{pendingPacks.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-secondary-600">Last Data Refresh:</span>
+                    <span className="font-semibold">{new Date().toLocaleTimeString()}</span>
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div className="bg-blue-50 rounded-lg p-6">
-              <h4 className="text-lg font-semibold text-blue-900 mb-2">Admin Guidelines</h4>
-              <ul className="text-sm text-blue-800 space-y-2">
-                <li>• Add packs that are currently available in the game store</li>
-                <li>• Double-check energy pot and raw energy values</li>
-                <li>• Use descriptive names for easy identification</li>
-                <li>• Added packs will be used as reference for grading new packs</li>
-              </ul>
-            </div>
           </div>
-        </div>
+        )}
       </motion.div>
     </div>
   );
 }
+
+export default AdminPanel;

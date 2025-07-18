@@ -61,7 +61,7 @@ function App() {
     { id: 'community', label: 'Community', icon: '👥' },
   ] as const;
 
-  const adminTab = { id: 'admin', label: isAdminAuthenticated ? 'Add Pack' : 'Admin Login', icon: isAdminAuthenticated ? '⚙️' : '🔐' } as const;
+  const adminTab = { id: 'admin', label: isAdminAuthenticated ? 'Admin Tools' : 'Admin Login', icon: isAdminAuthenticated ? '⚙️' : '🔐' } as const;
 
   const tabs = [...baseTabs, adminTab];
 
