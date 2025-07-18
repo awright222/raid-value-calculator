@@ -20,6 +20,7 @@ export interface PackData {
 
 export const ITEM_CATEGORIES = {
   ENERGY: 'Energy',
+  CURRENCY: 'Currency',
   LEVELING: 'Leveling',
   RANKING: 'Ranking Up',
   SUMMONING: 'Summoning Shards',
@@ -46,6 +47,16 @@ export const ITEM_TYPES: ItemType[] = [
     marketValue: 0.0004, // ~$0.0004 per energy unit
     energyEquivalent: 1,
     description: 'Direct energy units'
+  },
+
+  // Currency
+  {
+    id: 'silver',
+    name: 'Silver',
+    category: ITEM_CATEGORIES.CURRENCY,
+    marketValue: 0.000002, // ~$0.000002 per silver (1M silver ≈ $2)
+    energyEquivalent: 0.4, // Energy equivalent based on farming efficiency
+    description: 'In-game currency for upgrades and purchases'
   },
 
   // Leveling
