@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
-import { addPack } from '../firebase/database';
+import { addPack, addPackWithValidation } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
+import { PackIntelligence } from './PackIntelligence';
 import type { PendingPack } from '../utils/duplicateDetection';
 
 interface AdminPanelProps {
@@ -10,7 +11,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -21,6 +22,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     price: '',
   });
   const [packItems, setPackItems] = useState<PackItem[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
   // Bulk import state
   const [bulkData, setBulkData] = useState('');
@@ -38,6 +40,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
 
   const adminTabs = [
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
+    { id: 'intelligence', label: 'Pack Intelligence', icon: '📊', description: 'Market analysis & pack evolution' },
     { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
     { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
     { id: 'maintenance', label: 'Maintenance', icon: '🔧', description: 'System cleanup' }
@@ -99,10 +102,10 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
 
     setLoading(true);
     setError('');
+    setValidationWarnings([]);
+    setValidationWarnings([]);
 
     try {
-      // Remove unused packValue calculation
-      
       // Calculate energy from items
       let energyPots = 0;
       let rawEnergy = 0;
@@ -119,7 +122,8 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const totalEnergy = energyPots * 130 + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(formData.price) / totalEnergy : 0;
       
-      await addPack({
+      // Use enhanced validation
+      const result = await addPackWithValidation({
         name: formData.name,
         price: parseFloat(formData.price),
         energy_pots: energyPots,
@@ -132,7 +136,18 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
         })),
       });
 
-      setSuccess('Pack added successfully!');
+      // Show validation results
+      if (result.warnings.length > 0) {
+        setValidationWarnings(result.warnings);
+        console.log('⚠️ Pack validation warnings:', result.warnings);
+      }
+      
+      if (result.suggestions.length > 0) {
+        console.log('💡 Pack validation suggestions:', result.suggestions);
+      }
+
+      setSuccess('Pack added successfully!' + 
+        (result.warnings.length > 0 ? ' (See warnings below)' : ''));
       setFormData({ name: '', price: '' });
       setPackItems([]);
       onPackAdded();
@@ -285,6 +300,43 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
               <span>{success || error}</span>
               <button
                 onClick={() => { setSuccess(''); setError(''); }}
+                className="text-current opacity-70 hover:opacity-100 ml-4"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Validation Warnings */}
+        {validationWarnings.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="p-4 rounded-xl bg-blue-50 text-blue-800 border border-blue-200"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h4 className="font-semibold mb-2">ℹ️ Automatic Pack Versioning</h4>
+                <ul className="text-sm space-y-1">
+                  {validationWarnings.map((warning, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="mr-2">•</span>
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 p-3 bg-blue-100 rounded-lg">
+                  <p className="text-xs font-medium">
+                    🎯 <strong>No action needed!</strong> The pack has been saved with the exact name you entered. 
+                    Our system automatically handles duplicate pack names behind the scenes while keeping 
+                    your data clean and accurate.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setValidationWarnings([]); }}
                 className="text-current opacity-70 hover:opacity-100 ml-4"
               >
                 ✕
@@ -616,6 +668,22 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Pack Intelligence Tab */}
+        {activeAdminTab === 'intelligence' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Pack Market Intelligence
+              </h2>
+              <p className="text-secondary-600">
+                Analyze pack evolution, market trends, and competitive positioning
+              </p>
+            </div>
+            
+            <PackIntelligence />
           </div>
         )}
 
