@@ -25,7 +25,8 @@ export const ITEM_CATEGORIES = {
   RANKING: 'Ranking Up',
   SUMMONING: 'Summoning Shards',
   SOUL_SUMMONING: 'Soul Summoning',
-  SKILL_TOMES: 'Skill Tomes'
+  SKILL_TOMES: 'Skill Tomes',
+  FARMING: 'Farming & Convenience'
 } as const;
 
 export const ITEM_TYPES: ItemType[] = [
@@ -175,6 +176,14 @@ export const ITEM_TYPES: ItemType[] = [
     name: 'Mythical Skill Tome',
     category: ITEM_CATEGORIES.SKILL_TOMES,
     description: 'Skill book for mythical champions'
+  },
+
+  // Farming & Convenience
+  {
+    id: 'multi_battle_attempts',
+    name: 'Multi-Battle Attempts',
+    category: ITEM_CATEGORIES.FARMING,
+    description: 'Attempts for automated multi-battle farming'
   }
 ];
 
