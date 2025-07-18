@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import GradeDisplay from './GradeDisplay';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
-import { analyzePackValue, getAllPacks } from '../firebase/database';
+import { analyzePackValue } from '../firebase/database';
 import { savePackAnalysis } from '../firebase/historical';
 import { calculateItemPrices } from '../services/pricingService';
 import { Timestamp } from 'firebase/firestore';
