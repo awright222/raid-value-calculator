@@ -5,6 +5,7 @@ import ConfidenceIndicator from './ConfidenceIndicator';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { savePackAnalysis } from '../firebase/historical';
 import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
+import { useAnalytics } from '../services/analytics';
 import { Timestamp } from 'firebase/firestore';
 
 interface AnalysisResult {
@@ -35,6 +36,8 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [itemStats, setItemStats] = useState<Record<string, { totalQuantity: number; packCount: number }>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [lastDataUpdate, setLastDataUpdate] = useState<Date>(new Date());
+  
+  const analytics = useAnalytics();
 
   useEffect(() => {
     loadItemPrices();
@@ -204,6 +207,16 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       };
       
       setResult(resultData);
+
+      // Track pack analysis for analytics
+      analytics.trackConversion('calculator_use', {
+        packPrice: parseFloat(price),
+        grade: resultData.grade,
+        totalEnergy: totalEnergy,
+        itemCount: packItems.length,
+        hasEnergyPots: packItems.some(item => item.itemTypeId === 'energy_pot'),
+        hasRawEnergy: packItems.some(item => item.itemTypeId === 'raw_energy')
+      });
         
       // Save pack analysis to historical data
       try {

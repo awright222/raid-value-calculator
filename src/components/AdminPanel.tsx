@@ -4,6 +4,7 @@ import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem
 import { addPack, addPackWithValidation } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
 import { PackIntelligence } from './PackIntelligence';
+import { AnalyticsDashboard } from './AnalyticsDashboard';
 import type { PendingPack } from '../utils/duplicateDetection';
 
 interface AdminPanelProps {
@@ -11,7 +12,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -40,6 +41,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
 
   const adminTabs = [
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
+    { id: 'analytics', label: 'Analytics', icon: '📈', description: 'User engagement & traffic stats' },
     { id: 'intelligence', label: 'Pack Intelligence', icon: '📊', description: 'Market analysis & pack evolution' },
     { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
     { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
@@ -668,6 +670,22 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Analytics Tab */}
+        {activeAdminTab === 'analytics' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Analytics Dashboard
+              </h2>
+              <p className="text-secondary-600">
+                Privacy-compliant user engagement and traffic statistics
+              </p>
+            </div>
+            
+            <AnalyticsDashboard />
           </div>
         )}
 

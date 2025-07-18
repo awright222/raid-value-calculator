@@ -8,6 +8,9 @@ import CommunityTab from './components/CommunityTab';
 import MarketTrends from './components/MarketTrends';
 import Header from './components/Header';
 import LoginModal from './components/LoginModal';
+import { ConsentProvider } from './context/ConsentContext';
+import { CookieConsent } from './components/CookieConsent';
+import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin'>('analyze');
@@ -68,11 +71,15 @@ function App() {
   const tabs = [...baseTabs, adminTab];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300">
-      <Header 
-        isAdminAuthenticated={isAdminAuthenticated} 
-        onLogout={handleAdminLogout}
-      />
+    <ConsentProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300">
+        <Header 
+          isAdminAuthenticated={isAdminAuthenticated} 
+          onLogout={handleAdminLogout}
+        />
+        
+        {/* Analytics Tracking */}
+        <AnalyticsTracker activeTab={activeTab} />
       
       <main className="container mx-auto px-4 py-8">
         {/* Tab Navigation */}
@@ -145,15 +152,17 @@ function App() {
         </div>
       </footer>
 
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onLogin={handleAdminLogin}
-        onClose={() => setShowLoginModal(false)}
-        error={loginError}
-      />
-    </div>
-  );
-}
+        {/* Login Modal */}
+        <LoginModal
+          isOpen={showLoginModal}
+          onLogin={handleAdminLogin}
+          onClose={() => setShowLoginModal(false)}
+          error={loginError}
+        />
 
-export default App;
+        {/* Cookie Consent Banner */}
+        <CookieConsent />
+      </div>
+    </ConsentProvider>
+  );
+}export default App;
