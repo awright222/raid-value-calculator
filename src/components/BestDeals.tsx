@@ -27,6 +27,36 @@ export default function BestDeals() {
   const loadBestDeals = async () => {
     try {
       const packs = await getAllPacks();
+      
+      // First, calculate average prices for each item type from all packs
+      const itemStats: Record<string, { totalCost: number; totalQuantity: number }> = {};
+      
+      packs.forEach(pack => {
+        if (!pack.items || pack.items.length === 0) return;
+        
+        const totalItems = pack.items.reduce((sum, item) => sum + item.quantity, 0);
+        
+        pack.items.forEach(item => {
+          if (!itemStats[item.itemTypeId]) {
+            itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0 };
+          }
+          
+          // Proportional cost allocation
+          const itemProportion = item.quantity / totalItems;
+          const itemCost = pack.price * itemProportion;
+          
+          itemStats[item.itemTypeId].totalCost += itemCost;
+          itemStats[item.itemTypeId].totalQuantity += item.quantity;
+        });
+      });
+
+      // Calculate average prices per item
+      const averagePrices: Record<string, number> = {};
+      Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
+        averagePrices[itemTypeId] = stats.totalCost / stats.totalQuantity;
+      });
+
+      // Now evaluate each pack against these averages
       const packsWithValue: PackWithValue[] = [];
 
       packs.forEach(pack => {
@@ -34,17 +64,17 @@ export default function BestDeals() {
 
         let totalMarketValue = 0;
         pack.items.forEach(item => {
-          const itemType = getItemTypeById(item.itemTypeId);
-          if (itemType?.marketValue) {
-            totalMarketValue += item.quantity * itemType.marketValue;
+          const averagePrice = averagePrices[item.itemTypeId];
+          if (averagePrice) {
+            totalMarketValue += item.quantity * averagePrice;
           }
         });
 
         const savings = totalMarketValue - pack.price;
         const savingsPercentage = totalMarketValue > 0 ? (savings / totalMarketValue) * 100 : 0;
 
-        // Only include packs with positive savings (good deals)
-        if (savings > 0) {
+        // Only include packs with positive savings (better than average)
+        if (savings > 0 && savingsPercentage > 5) { // At least 5% better than average
           // Simple grading based on savings percentage
           let grade = 'F';
           if (savingsPercentage >= 50) grade = 'A+';

@@ -44,6 +44,10 @@ export default function ItemValues() {
           
           itemStats[item.itemTypeId].totalCost += itemCost;
           itemStats[item.itemTypeId].totalQuantity += item.quantity;
+        });
+        
+        // Count unique packs for each item type
+        pack.items.forEach(item => {
           itemStats[item.itemTypeId].packCount += 1;
         });
       });
