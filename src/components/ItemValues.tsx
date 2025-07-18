@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getAllPacks } from '../firebase/database';
 import { ITEM_TYPES, getItemTypeById } from '../types/itemTypes';
+import ConfidenceIndicator from './ConfidenceIndicator';
 
 interface ItemValue {
   itemTypeId: string;
@@ -203,9 +204,11 @@ export default function ItemValues() {
                   <div className="text-2xl font-bold text-primary-600">
                     ${item.averagePrice.toFixed(4)}
                   </div>
-                  <div className="text-sm text-secondary-600">
-                    {item.totalQuantity.toLocaleString()} total • {item.packCount} packs
-                  </div>
+                  <ConfidenceIndicator 
+                    totalQuantity={item.totalQuantity}
+                    packCount={item.packCount}
+                    className="justify-end"
+                  />
                 </div>
               </div>
             </motion.div>

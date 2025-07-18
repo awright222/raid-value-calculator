@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import GradeDisplay from './GradeDisplay';
+import ConfidenceIndicator from './ConfidenceIndicator';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { analyzePackValue, getAllPacks } from '../firebase/database';
 
@@ -26,6 +27,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [itemPrices, setItemPrices] = useState<Record<string, number>>({});
+  const [itemStats, setItemStats] = useState<Record<string, { totalQuantity: number; packCount: number }>>({});
 
   useEffect(() => {
     loadItemPrices();
@@ -34,7 +36,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const loadItemPrices = async () => {
     try {
       const packs = await getAllPacks();
-      let itemStats: Record<string, { totalCost: number; totalQuantity: number }> = {};
+      let itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = {};
       let currentPrices: Record<string, number> = {};
       
       // Step 1: Get prices from single-item packs (these are definitive)
@@ -43,11 +45,12 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         
         const item = pack.items[0];
         if (!itemStats[item.itemTypeId]) {
-          itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0 };
+          itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
         }
         
         itemStats[item.itemTypeId].totalCost += pack.price;
         itemStats[item.itemTypeId].totalQuantity += item.quantity;
+        itemStats[item.itemTypeId].packCount += 1;
       });
 
       // Calculate initial prices from single-item packs
@@ -62,7 +65,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
 
       while (iteration < maxIterations) {
         let pricesChanged = false;
-        const newItemStats: Record<string, { totalCost: number; totalQuantity: number }> = { ...itemStats };
+        const newItemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = JSON.parse(JSON.stringify(itemStats));
 
         multiItemPacks.forEach(pack => {
           if (!pack.items || pack.items.length <= 1) return;
@@ -92,11 +95,12 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                 const inferredPricePerItem = (remainingValue * item.quantity) / totalUnknownQuantity / item.quantity;
                 
                 if (!newItemStats[item.itemTypeId]) {
-                  newItemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0 };
+                  newItemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
                 }
                 
                 newItemStats[item.itemTypeId].totalCost += inferredPricePerItem * item.quantity;
                 newItemStats[item.itemTypeId].totalQuantity += item.quantity;
+                newItemStats[item.itemTypeId].packCount += 1;
               });
             }
           }
@@ -124,6 +128,16 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       }
       
       setItemPrices(currentPrices);
+      
+      // Create a simplified stats object for confidence indicators
+      const statsForConfidence: Record<string, { totalQuantity: number; packCount: number }> = {};
+      Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
+        statsForConfidence[itemTypeId] = {
+          totalQuantity: stats.totalQuantity,
+          packCount: stats.packCount
+        };
+      });
+      setItemStats(statsForConfidence);
     } catch (error) {
       console.error('Error loading item prices:', error);
     }
@@ -533,9 +547,17 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                                     <span className="font-medium text-secondary-900">{item.quantity}x {item.itemType.name}</span>
                                     <span className="text-sm text-secondary-600 ml-2">({item.itemType.category})</span>
                                   </div>
-                                  <div className="text-right">
-                                    <div className="font-bold text-secondary-900">${item.marketValue.toFixed(2)}</div>
-                                    <div className="text-xs text-secondary-600">{item.energyEquivalent.toLocaleString()} energy equiv.</div>
+                                  <div className="flex items-center space-x-4">
+                                    <div className="text-right">
+                                      <div className="font-bold text-secondary-900">${item.marketValue.toFixed(2)}</div>
+                                      <div className="text-xs text-secondary-600">{item.energyEquivalent.toLocaleString()} energy equiv.</div>
+                                    </div>
+                                    {itemStats[item.itemType.id] && (
+                                      <ConfidenceIndicator 
+                                        totalQuantity={itemStats[item.itemType.id].totalQuantity}
+                                        packCount={itemStats[item.itemType.id].packCount}
+                                      />
+                                    )}
                                   </div>
                                 </div>
                               ))}
