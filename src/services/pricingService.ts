@@ -49,16 +49,17 @@ export const clearPricingCache = () => {
 };
 
 export const calculateItemPrices = async (forceRefresh: boolean = false): Promise<PricingResult> => {
-  // Check if we have valid cached data
-  const now = Date.now();
-  if (!forceRefresh && pricingCache && (now - lastCacheTime) < CACHE_DURATION_MS) {
-    console.log('🚀 Using cached pricing data');
-    return pricingCache;
-  }
+  try {
+    // Check if we have valid cached data
+    const now = Date.now();
+    if (!forceRefresh && pricingCache && (now - lastCacheTime) < CACHE_DURATION_MS) {
+      console.log('🚀 Using cached pricing data');
+      return pricingCache;
+    }
 
-  console.log('🔄 Calculating fresh pricing data...');
-  const packs = await getAllPacks();
-  console.log('Pricing Algorithm: Loading data from', packs.length, 'packs');
+    console.log('🔄 Calculating fresh pricing data...');
+    const packs = await getAllPacks();
+    console.log('Pricing Algorithm: Loading data from', packs.length, 'packs');
   
   // Filter packs that have items data (include ALL items, not just energy items)
   const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0);
@@ -297,7 +298,26 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
     console.log(`Raw Energy: $${currentPrices['raw_energy'].toFixed(6)} per energy`);
   }
 
-  return result;
+    return result;
+  } catch (error) {
+    console.error('Error calculating item prices:', error);
+    
+    // Log specific Firebase error details
+    if (error instanceof Error) {
+      console.error('Firebase Error Details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+    }
+    
+    // Return empty result on error to prevent app crash
+    return {
+      itemPrices: {},
+      itemStats: {},
+      totalPacks: 0
+    };
+  }
 };
 
 /**
