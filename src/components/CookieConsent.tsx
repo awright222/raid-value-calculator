@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConsent } from '../context/ConsentContext';
+import { PrivacyPolicy } from './PrivacyPolicy';
+import { TermsOfService } from './TermsOfService';
 
 export const CookieConsent: React.FC = () => {
   const { consent, setConsent } = useConsent();
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showTermsOfService, setShowTermsOfService] = useState(false);
 
   // Don't show if user has already made a choice
   if (consent !== 'none') return null;
@@ -70,11 +74,17 @@ export const CookieConsent: React.FC = () => {
           <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
             <p className="flex flex-wrap items-center justify-center lg:justify-start gap-1">
               <span>By continuing to use this site, you agree to our</span>
-              <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium transition-colors">
+              <button 
+                onClick={() => setShowPrivacyPolicy(true)}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium transition-colors"
+              >
                 Privacy Policy
               </button>
               <span>and</span>
-              <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium transition-colors">
+              <button 
+                onClick={() => setShowTermsOfService(true)}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium transition-colors"
+              >
                 Terms of Service
               </button>
               <span className="hidden sm:inline">•</span>
@@ -83,6 +93,20 @@ export const CookieConsent: React.FC = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* Privacy Policy Modal */}
+      <AnimatePresence>
+        {showPrivacyPolicy && (
+          <PrivacyPolicy onClose={() => setShowPrivacyPolicy(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Terms of Service Modal */}
+      <AnimatePresence>
+        {showTermsOfService && (
+          <TermsOfService onClose={() => setShowTermsOfService(false)} />
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };
