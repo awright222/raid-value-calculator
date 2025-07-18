@@ -1,0 +1,49 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "packs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "pack_analysis_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "analysisDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "pack_data_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "packName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "market_trends",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

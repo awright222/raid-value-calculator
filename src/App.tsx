@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PackAnalyzer from './components/PackAnalyzer';
 import AdminPanel from './components/AdminPanel';
@@ -8,6 +8,7 @@ import CommunityTab from './components/CommunityTab';
 import MarketTrends from './components/MarketTrends';
 import Header from './components/Header';
 import LoginModal from './components/LoginModal';
+import { BiometricLogin } from './components/BiometricLogin';
 import { ConsentProvider } from './context/ConsentContext';
 import { CookieConsent } from './components/CookieConsent';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
@@ -15,11 +16,35 @@ import { AnalyticsTracker } from './components/AnalyticsTracker';
 function App() {
   const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin'>('analyze');
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showBiometricLogin, setShowBiometricLogin] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Simple admin password check (you can set this to whatever you want)
-  const ADMIN_PASSWORD = 'admin123'; // Change this to your preferred password
+  // Simple admin password check (fallback for devices without biometric support)
+  const ADMIN_PASSWORD = 'RaidCalc2025!SecurePass'; // Change this to your preferred password
+
+  // Check if user was previously logged in
+  useEffect(() => {
+    const wasLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+    if (wasLoggedIn) {
+      setIsAdminAuthenticated(true);
+    }
+  }, []);
+
+  const handleBiometricSuccess = () => {
+    setIsAdminAuthenticated(true);
+    setShowBiometricLogin(false);
+    setShowLoginModal(false);
+    setLoginError('');
+    setActiveTab('admin');
+    // Store login state in localStorage for persistence
+    localStorage.setItem('adminLoggedIn', 'true');
+  };
+
+  const handleBiometricFallback = () => {
+    setShowBiometricLogin(false);
+    setShowLoginModal(true);
+  };
 
   const handleAdminLogin = async (password: string) => {
     if (password === ADMIN_PASSWORD) {
@@ -44,7 +69,7 @@ function App() {
 
   const handleTabClick = (tabId: 'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin') => {
     if (tabId === 'admin' && !isAdminAuthenticated) {
-      setShowLoginModal(true);
+      setShowBiometricLogin(true);
       setLoginError('');
     } else {
       setActiveTab(tabId);
@@ -151,6 +176,32 @@ function App() {
           </div>
         </div>
       </footer>
+
+        {/* Biometric Login Modal */}
+        <AnimatePresence>
+          {showBiometricLogin && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+              onClick={() => setShowBiometricLogin(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md"
+              >
+                <BiometricLogin
+                  onSuccess={handleBiometricSuccess}
+                  onFallbackToPassword={handleBiometricFallback}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Login Modal */}
         <LoginModal

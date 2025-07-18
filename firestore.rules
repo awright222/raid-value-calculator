@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is admin (basic password check)
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Public read access to packs (anyone can view pack data)
+    match /packs/{packId} {
+      allow read: if true;
+      // Allow writes only for admin or temporary public submission (you can tighten this later)
+      allow write: if true; // TEMPORARY: Enable for community submissions, secure later
+    }
+    
+    // Public read access to historical data for analytics
+    match /pack_analysis_history/{analysisId} {
+      allow read: if true;
+      allow write: if true; // Allow pack analysis submissions
+    }
+    
+    match /price_snapshots/{snapshotId} {
+      allow read: if true;
+      allow write: if true; // Allow price tracking
+    }
+    
+    match /market_trends/{trendId} {
+      allow read: if true;
+      allow write: if true; // Allow trend calculations
+    }
+    
+    // New pack intelligence collections
+    match /pack_data_history/{historyId} {
+      allow read: if true;
+      allow write: if true; // Allow pack history tracking
+    }
+    
+    match /pack_market_intelligence/{intelligenceId} {
+      allow read: if true;
+      allow write: if true; // Allow intelligence generation
+    }
+    
+    // Pending packs - more restrictive
+    match /pending_packs/{packId} {
+      allow read: if false; // Only admin should see pending
+      allow write: if true; // Allow community submissions to pending
+    }
+    
+    // Analytics events - write-only for privacy
+    match /analytics_events/{eventId} {
+      allow read: if false; // Privacy: users can't read analytics
+      allow write: if true;  // Allow anonymous analytics submission
+    }
+    
+    // Default: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
