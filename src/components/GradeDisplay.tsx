@@ -10,7 +10,7 @@ export default function GradeDisplay({ grade }: GradeDisplayProps) {
       case 'SSS':
         return {
           label: 'SSS - LEGENDARY DEAL',
-          description: '🔥 INSANE VALUE! This pack is an absolute steal - buy immediately! 🔥',
+          description: '🔥 INCREDIBLE VALUE! This pack offers exceptional value compared to market rates. 🔥',
           className: 'grade-sss',
           icon: '👑'
         };

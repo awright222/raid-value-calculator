@@ -21,8 +21,8 @@ function App() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Simple admin password check (fallback for devices without biometric support)
-  const ADMIN_PASSWORD = 'RaidCalc2025!SecurePass'; // Change this to your preferred password
+  // Admin password - should be set via environment variable in production
+  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123'; // Fallback for development
 
   // Check if user was previously logged in
   useEffect(() => {
@@ -71,7 +71,8 @@ function App() {
   const handleTabClick = (tabId: 'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin') => {
     console.log('🔄 Tab clicked:', tabId);
     if (tabId === 'admin' && !isAdminAuthenticated) {
-      setShowBiometricLogin(true);
+      // Show password login by default instead of biometric
+      setShowLoginModal(true);
       setLoginError('');
     } else {
       console.log('✅ Setting activeTab to:', tabId);
@@ -211,6 +212,10 @@ function App() {
           isOpen={showLoginModal}
           onLogin={handleAdminLogin}
           onClose={() => setShowLoginModal(false)}
+          onBiometricLogin={() => {
+            setShowLoginModal(false);
+            setShowBiometricLogin(true);
+          }}
           error={loginError}
         />
 

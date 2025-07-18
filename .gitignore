@@ -29,9 +29,11 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
 # Files with potentially sensitive data
 fix-existing-packs.js
+debug-pending-packs.js
 *.config.js.backup
 firebase-config.js
 

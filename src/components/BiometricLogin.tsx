@@ -22,7 +22,20 @@ export const BiometricLogin: React.FC<BiometricLoginProps> = ({
   const checkBiometricAvailability = async () => {
     const available = await BiometricAuth.isAvailable();
     setIsAvailable(available);
+    
+    // Check if setup needs to be reset due to staleness
+    const wasReset = BiometricAuth.resetIfNeeded();
+    if (wasReset) {
+      setError('Biometric setup was reset due to age. Please set up again.');
+    }
+    
     setIsSetup(BiometricAuth.isSetup());
+  };
+
+  const handleResetBiometric = () => {
+    BiometricAuth.clearSetup();
+    setIsSetup(false);
+    setError('');
   };
 
   const handleSetupBiometric = async () => {
@@ -146,6 +159,15 @@ export const BiometricLogin: React.FC<BiometricLoginProps> = ({
         >
           Use Password Instead
         </button>
+
+        {isSetup && (
+          <button
+            onClick={handleResetBiometric}
+            className="w-full px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm"
+          >
+            Reset Biometric Setup
+          </button>
+        )}
       </div>
     </div>
   );

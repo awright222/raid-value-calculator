@@ -21,6 +21,25 @@ export class BiometricAuth {
     }
   }
 
+  // Clear stored credentials (reset biometric setup)
+  static clearSetup(): void {
+    localStorage.removeItem('biometric-credential-id');
+    localStorage.removeItem('biometric-setup-date');
+  }
+
+  // Check if setup is recent (within 30 days) to prevent stale credentials
+  static isSetupValid(): boolean {
+    const credentialId = localStorage.getItem('biometric-credential-id');
+    const setupDate = localStorage.getItem('biometric-setup-date');
+    
+    if (!credentialId || !setupDate) {
+      return false;
+    }
+    
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    return parseInt(setupDate) > thirtyDaysAgo;
+  }
+
   // Register biometric authentication (one-time setup)
   static async register(): Promise<BiometricAuthResult> {
     try {
@@ -42,17 +61,19 @@ export class BiometricAuth {
           },
           pubKeyCredParams: [{ alg: -7, type: "public-key" }],
           authenticatorSelection: {
-            authenticatorAttachment: "platform",
+            authenticatorAttachment: "platform", // Force platform authenticator (Touch ID/Face ID)
+            requireResidentKey: false,
             userVerification: "required",
           },
-          timeout: 60000,
-          attestation: "direct"
+          timeout: 30000, // Shorter timeout
+          attestation: "none" // Don't require attestation
         },
       }) as PublicKeyCredential;
 
       if (credential) {
-        // Store credential ID in localStorage for future auth
+        // Store credential ID and setup date in localStorage for future auth
         localStorage.setItem('biometric-credential-id', credential.id);
+        localStorage.setItem('biometric-setup-date', Date.now().toString());
         return { success: true };
       }
       
@@ -87,7 +108,7 @@ export class BiometricAuth {
             type: 'public-key',
           }],
           userVerification: "required",
-          timeout: 60000,
+          timeout: 30000, // Shorter timeout
         },
       }) as PublicKeyCredential;
 
@@ -106,8 +127,17 @@ export class BiometricAuth {
     }
   }
 
-  // Check if biometric auth is already set up
+  // Check if biometric auth is already set up and valid
   static isSetup(): boolean {
-    return !!localStorage.getItem('biometric-credential-id');
+    return this.isSetupValid();
+  }
+
+  // Reset biometric setup if it's stale or causing issues
+  static resetIfNeeded(): boolean {
+    if (!this.isSetupValid()) {
+      this.clearSetup();
+      return true; // Was reset
+    }
+    return false; // No reset needed
   }
 }

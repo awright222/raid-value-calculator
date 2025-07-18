@@ -5,10 +5,11 @@ interface LoginModalProps {
   isOpen: boolean;
   onLogin: (password: string) => void;
   onClose: () => void;
+  onBiometricLogin?: () => void;
   error?: string;
 }
 
-export default function LoginModal({ isOpen, onLogin, onClose, error }: LoginModalProps) {
+export default function LoginModal({ isOpen, onLogin, onClose, onBiometricLogin, error }: LoginModalProps) {
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,6 +84,21 @@ export default function LoginModal({ isOpen, onLogin, onClose, error }: LoginMod
             </button>
           </div>
         </form>
+
+        {onBiometricLogin && (
+          <div className="mt-6 pt-6 border-t border-secondary-200/50">
+            <p className="text-secondary-600 text-sm text-center mb-3">
+              Or use biometric authentication
+            </p>
+            <button
+              onClick={onBiometricLogin}
+              className="w-full px-4 py-2 rounded-xl bg-secondary-100/50 hover:bg-secondary-200/50 text-secondary-700 text-sm border border-secondary-200/50 transition-colors flex items-center justify-center gap-2"
+            >
+              <span>🔐</span>
+              Use Fingerprint/Face ID
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );
