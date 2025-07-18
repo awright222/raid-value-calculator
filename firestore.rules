@@ -24,7 +24,7 @@ service cloud.firestore {
     // Public read access to packs (anyone can view pack data)
     match /packs/{packId} {
       allow read: if true;
-      // Restrict pack writes to reasonable data only
+      // Restore proper validation now that basic writes work
       allow write: if isValidPackData() && isWithinRateLimit();
     }
     

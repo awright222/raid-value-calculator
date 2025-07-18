@@ -24,6 +24,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
   });
   const [packItems, setPackItems] = useState<PackItem[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [formKey, setFormKey] = useState(0); // Force form re-render
 
   // Bulk import state
   const [bulkData, setBulkData] = useState('');
@@ -148,6 +149,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       // Reset form on success
       setFormData({ name: '', price: '' });
       setPackItems([]);
+      setFormKey(prev => prev + 1); // Force form re-render
       onPackAdded();
       
     } catch (error: any) {
@@ -479,7 +481,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
               </p>
             </div>
 
-            <form onSubmit={handleSinglePackSubmit} className="space-y-6">
+            <form onSubmit={handleSinglePackSubmit} className="space-y-6" key={formKey}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-secondary-700 mb-2">
