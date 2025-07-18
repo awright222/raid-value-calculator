@@ -58,6 +58,15 @@ export class BiometricAuth {
       
       return { success: false, error: 'Failed to create credential' };
     } catch (error: any) {
+      if (error.name === 'NotAllowedError') {
+        return { success: false, error: 'Authentication cancelled by user' };
+      } else if (error.name === 'InvalidStateError') {
+        return { success: false, error: 'Invalid credential state. Try resetting biometric setup.' };
+      } else if (error.name === 'NotSupportedError') {
+        return { success: false, error: 'Biometric authentication not supported on this device' };
+      } else if (error.message?.includes('security key') || error.message?.includes('authenticator')) {
+        return { success: false, error: 'Hardware security key required. Use password login instead or reset biometric setup.' };
+      }
       return { success: false, error: error.message || 'Registration failed' };
     }
   }
@@ -86,6 +95,12 @@ export class BiometricAuth {
     } catch (error: any) {
       if (error.name === 'NotAllowedError') {
         return { success: false, error: 'Authentication cancelled or failed' };
+      } else if (error.name === 'InvalidStateError') {
+        return { success: false, error: 'Invalid credential state. Try resetting biometric setup.' };
+      } else if (error.name === 'NotSupportedError') {
+        return { success: false, error: 'Biometric authentication not supported' };
+      } else if (error.message?.includes('security key') || error.message?.includes('authenticator')) {
+        return { success: false, error: 'Hardware security key required. Use password login instead.' };
       }
       return { success: false, error: error.message || 'Authentication failed' };
     }
@@ -94,10 +109,5 @@ export class BiometricAuth {
   // Check if biometric auth is already set up
   static isSetup(): boolean {
     return !!localStorage.getItem('biometric-credential-id');
-  }
-
-  // Clear biometric setup (for testing or reset)
-  static clearSetup(): void {
-    localStorage.removeItem('biometric-credential-id');
   }
 }

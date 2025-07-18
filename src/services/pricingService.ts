@@ -16,7 +16,7 @@ export interface PricingResult {
 }
 
 export interface PackValueAnalysis {
-  grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F' | 'NEW';
+  grade: 'SSS' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F' | 'NEW';
   totalValue: number;
   dollarsPerDollar: number; // How much value you get per dollar spent
   comparison: {
@@ -61,8 +61,8 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
     const packs = await getAllPacks();
     console.log('Pricing Algorithm: Loading data from', packs.length, 'packs');
   
-  // Filter packs that have items data (include ALL items, not just energy items)
-  const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0);
+  // Filter packs that have items data and valid prices (include ALL items, not just energy items)
+  const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0 && pack.price && pack.price > 0);
   const packsWithoutItems = packs.filter(pack => !pack.items || pack.items.length === 0);
   const energyPacks = packs.filter(pack => pack.items && pack.items.length > 0 && pack.total_energy > 0);
   const nonEnergyPacks = packs.filter(pack => pack.items && pack.items.length > 0 && pack.total_energy === 0);
@@ -89,7 +89,7 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
   // Step 1: Get baseline prices from single-item packs (these are definitive for ANY item type)
   let singleItemPackCount = 0;
   packsWithItems.forEach(pack => {
-    if (!pack.items || pack.items.length !== 1) return;
+    if (!pack.items || pack.items.length !== 1 || !pack.price || pack.price <= 0) return;
     
     singleItemPackCount++;
     const item = pack.items[0];
@@ -116,7 +116,7 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
 
   // Step 2: Iteratively calculate unknown item prices from multi-item packs
   // This will discover new item prices and refine existing ones
-  const multiItemPacks = packsWithItems.filter(pack => pack.items && pack.items.length > 1);
+  const multiItemPacks = packsWithItems.filter(pack => pack.items && pack.items.length > 1 && pack.price && pack.price > 0);
   console.log('Processing', multiItemPacks.length, 'multi-item packs to discover/refine prices');
   
   const maxIterations = 15; // Increased iterations for better convergence
@@ -150,7 +150,8 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
       });
 
       // If we have some known items and some unknown items, we can infer unknown prices
-      if (unknownItems.length > 0 && knownItems.length > 0 && knownValue < pack.price) {
+      // Check if pack has valid price before processing
+      if (unknownItems.length > 0 && knownItems.length > 0 && pack.price && pack.price > 0 && knownValue < pack.price) {
         const remainingValue = pack.price - knownValue;
         
         if (remainingValue > 0) {
@@ -173,7 +174,7 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
       }
       
       // Also use this pack to refine existing price estimates
-      if (unknownItems.length === 0 && knownItems.length > 1) {
+      if (unknownItems.length === 0 && knownItems.length > 1 && pack.price && pack.price > 0) {
         // This pack contains only known items - use it to validate/refine prices
         const calculatedValue = knownItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const actualValue = pack.price;
@@ -357,11 +358,22 @@ export const analyzePackValueNew = async (
     
     // Get all existing packs for comparison
     const allPacks = await getAllPacks();
-    const packsWithItems = allPacks.filter(pack => pack.items && pack.items.length > 0);
+    const packsWithItems = allPacks.filter(pack => pack.items && pack.items.length > 0 && pack.price && pack.price > 0);
     
     if (packsWithItems.length === 0) {
+      // Fallback grading based on value ratio when no comparison data exists
+      let fallbackGrade: 'SSS' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+      
+      if (dollarsPerDollar >= 3.0) fallbackGrade = 'SSS';
+      else if (dollarsPerDollar >= 2.0) fallbackGrade = 'S';
+      else if (dollarsPerDollar >= 1.5) fallbackGrade = 'A';
+      else if (dollarsPerDollar >= 1.2) fallbackGrade = 'B';
+      else if (dollarsPerDollar >= 1.0) fallbackGrade = 'C';
+      else if (dollarsPerDollar >= 0.8) fallbackGrade = 'D';
+      else fallbackGrade = 'F';
+      
       return {
-        grade: 'NEW',
+        grade: fallbackGrade,
         totalValue,
         dollarsPerDollar,
         comparison: {
@@ -385,8 +397,11 @@ export const analyzePackValueNew = async (
         packTotalValue += unitPrice * item.quantity;
       });
       
-      const packValueRatio = packTotalValue / pack.price;
-      packValueRatios.push({ pack, valueRatio: packValueRatio });
+      // Check if pack has a valid price before calculating ratio
+      if (pack.price && pack.price > 0) {
+        const packValueRatio = packTotalValue / pack.price;
+        packValueRatios.push({ pack, valueRatio: packValueRatio });
+      }
     }
     
     // Sort by value ratio (best deals first)
@@ -397,8 +412,9 @@ export const analyzePackValueNew = async (
     const betterThanPercent = Math.round(((packValueRatios.length - betterPacks.length) / packValueRatios.length) * 100);
     
     // Determine grade based on percentile
-    let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
-    if (betterThanPercent >= 90) grade = 'S';
+    let grade: 'SSS' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+    if (betterThanPercent >= 95) grade = 'SSS';
+    else if (betterThanPercent >= 90) grade = 'S';
     else if (betterThanPercent >= 80) grade = 'A';
     else if (betterThanPercent >= 70) grade = 'B';
     else if (betterThanPercent >= 60) grade = 'C';

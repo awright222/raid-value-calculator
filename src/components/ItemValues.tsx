@@ -41,11 +41,12 @@ export default function ItemValues() {
       // Convert to ItemValue array
       const values: ItemValue[] = Object.entries(itemStats).map(([itemTypeId, stats]) => {
         const itemType = getItemTypeById(itemTypeId);
+        const averagePrice = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
         return {
           itemTypeId,
           itemName: itemType?.name || 'Unknown Item',
           category: itemType?.category || 'Unknown',
-          averagePrice: stats.totalCost / stats.totalQuantity,
+          averagePrice,
           totalQuantity: stats.totalQuantity,
           packCount: stats.packCount
         };
@@ -59,8 +60,9 @@ export default function ItemValues() {
         const priceData: Record<string, { price: number; packCount: number; totalQuantity: number; itemName: string }> = {};
         Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
           const itemType = getItemTypeById(itemTypeId);
+          const price = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
           priceData[itemTypeId] = {
-            price: stats.totalCost / stats.totalQuantity,
+            price,
             packCount: stats.packCount,
             totalQuantity: stats.totalQuantity,
             itemName: itemType?.name || 'Unknown Item'
@@ -192,7 +194,7 @@ export default function ItemValues() {
                 
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary-600">
-                    ${item.averagePrice.toFixed(4)}
+                    ${(item.averagePrice && isFinite(item.averagePrice)) ? item.averagePrice.toFixed(4) : '0.0000'}
                   </div>
                   <ConfidenceIndicator 
                     totalQuantity={item.totalQuantity}

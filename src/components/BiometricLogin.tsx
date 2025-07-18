@@ -146,18 +146,6 @@ export const BiometricLogin: React.FC<BiometricLoginProps> = ({
         >
           Use Password Instead
         </button>
-
-        {isSetup && (
-          <button
-            onClick={() => {
-              BiometricAuth.clearSetup();
-              setIsSetup(false);
-            }}
-            className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
-          >
-            Reset Biometric Setup
-          </button>
-        )}
       </div>
     </div>
   );

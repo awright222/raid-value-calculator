@@ -45,8 +45,11 @@ export const submitPendingPack = async (
   submitterEmail?: string
 ): Promise<{ success: boolean; packId?: string; message: string; duplicateFound?: boolean }> => {
   try {
+    console.log('🚀 Starting pack submission:', { packData, submitterId, submitterEmail });
+    
     // Validate pack data
     const validation = validatePackData(packData);
+    console.log('📝 Validation result:', validation);
     if (!validation.isValid) {
       return {
         success: false,
@@ -184,6 +187,7 @@ export const submitPendingPack = async (
 // Get all pending packs
 export const getPendingPacks = async (): Promise<PendingPack[]> => {
   try {
+    // Try the optimized query first (requires composite index)
     const q = query(
       collection(db, 'pending_packs'),
       where('status', '==', 'pending'),
@@ -198,8 +202,29 @@ export const getPendingPacks = async (): Promise<PendingPack[]> => {
       expires_at: doc.data().expires_at.toDate()
     } as PendingPack));
   } catch (error) {
-    console.error('Error fetching pending packs:', error);
-    return [];
+    console.error('Error with optimized query, trying fallback:', error);
+    
+    // Fallback: use simpler query without orderBy if index is still building
+    try {
+      const fallbackQuery = query(
+        collection(db, 'pending_packs'),
+        where('status', '==', 'pending')
+      );
+      
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      const packs = fallbackSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        submitted_at: doc.data().submitted_at.toDate(),
+        expires_at: doc.data().expires_at.toDate()
+      } as PendingPack));
+      
+      // Sort in memory since we can't use orderBy
+      return packs.sort((a, b) => b.submitted_at.getTime() - a.submitted_at.getTime());
+    } catch (fallbackError) {
+      console.error('Error with fallback query:', fallbackError);
+      return [];
+    }
   }
 };
 
@@ -313,5 +338,17 @@ export const cleanupExpiredPacks = async (): Promise<number> => {
   } catch (error) {
     console.error('Error cleaning up expired packs:', error);
     return 0;
+  }
+};
+
+// Delete a specific pending pack (admin function)
+export const deletePendingPack = async (packId: string): Promise<boolean> => {
+  try {
+    const packRef = doc(db, 'pending_packs', packId);
+    await deleteDoc(packRef);
+    return true;
+  } catch (error) {
+    console.error('Error deleting pending pack:', error);
+    return false;
   }
 };

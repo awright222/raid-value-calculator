@@ -100,7 +100,9 @@ export default function PackList({ packs, loading }: PackListProps) {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-700">Cost per Energy:</span>
-                    <span className="font-bold text-lg">${pack.cost_per_energy.toFixed(5)}</span>
+                    <span className="font-bold text-lg">
+                      ${(pack.cost_per_energy && isFinite(pack.cost_per_energy)) ? pack.cost_per_energy.toFixed(5) : '0.00000'}
+                    </span>
                   </div>
                 </div>
 

@@ -238,10 +238,10 @@ export default function BestDeals() {
                     <GradeDisplay grade={pack.grade} />
                     <div>
                       <h3 className="text-lg font-semibold text-secondary-800">
-                        ${pack.price.toFixed(2)} Pack
+                        ${pack.price ? pack.price.toFixed(2) : '0.00'} Pack
                       </h3>
                       <p className="text-sm text-green-600 font-medium">
-                        Save ${pack.savings.toFixed(2)} ({pack.savingsPercentage.toFixed(1)}% off)
+                        Save ${pack.savings ? pack.savings.toFixed(2) : '0.00'} ({pack.savingsPercentage ? pack.savingsPercentage.toFixed(1) : '0'}% off)
                       </p>
                     </div>
                   </div>
@@ -262,7 +262,7 @@ export default function BestDeals() {
                 
                 <div className="text-right">
                   <div className="text-lg font-bold text-secondary-800">
-                    ${pack.totalValue.toFixed(2)}
+                    ${pack.totalValue ? pack.totalValue.toFixed(2) : '0.00'}
                   </div>
                   <div className="text-sm text-secondary-600">Market Value</div>
                 </div>

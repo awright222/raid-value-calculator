@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { addPack, addPackWithValidation } from '../firebase/database';
-import { getPendingPacks, approvePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
+import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import type { PendingPack } from '../utils/duplicateDetection';
@@ -264,6 +264,25 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     }
   };
 
+  const handleDeletePack = async (packId: string, packName: string) => {
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete the pack "${packName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const success = await deletePendingPack(packId);
+      if (success) {
+        setSuccess('Pack deleted successfully!');
+        await loadPendingPacks();
+      } else {
+        setError('Failed to delete pack');
+      }
+    } catch (error) {
+      setError('Failed to delete pack');
+    }
+  };
+
   // Maintenance functions
   const handleCleanupExpired = async () => {
     setLoading(true);
@@ -279,6 +298,16 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to calculate value grade
+  const getValueGrade = (costPerEnergy: number): { grade: string; color: string } => {
+    if (costPerEnergy <= 0.005) return { grade: 'S+', color: 'bg-purple-500 text-white' };
+    if (costPerEnergy <= 0.007) return { grade: 'S', color: 'bg-blue-500 text-white' };
+    if (costPerEnergy <= 0.009) return { grade: 'A', color: 'bg-green-500 text-white' };
+    if (costPerEnergy <= 0.012) return { grade: 'B', color: 'bg-yellow-500 text-white' };
+    if (costPerEnergy <= 0.015) return { grade: 'C', color: 'bg-orange-500 text-white' };
+    return { grade: 'D', color: 'bg-red-500 text-white' };
   };
 
   return (
@@ -410,51 +439,92 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {pendingPacks.map((pack) => (
-                  <div key={pack.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-secondary-800 dark:text-gray-200 mb-2">{pack.name}</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                          <div>
-                            <span className="text-secondary-500 dark:text-gray-400">Price:</span>
-                            <div className="font-semibold text-gray-900 dark:text-gray-100">${pack.price}</div>
-                          </div>
-                          <div>
-                            <span className="text-secondary-500 dark:text-gray-400">Energy:</span>
-                            <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.total_energy.toLocaleString()}</div>
-                          </div>
-                          <div>
-                            <span className="text-secondary-500 dark:text-gray-400">Confirmations:</span>
-                            <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.confirmation_count}/3</div>
-                          </div>
-                          <div>
-                            <span className="text-secondary-500 dark:text-gray-400">Submitted:</span>
-                            <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.submitted_at.toLocaleDateString()}</div>
+                {pendingPacks.map((pack) => {
+                  const valueGrade = getValueGrade(pack.cost_per_energy);
+                  
+                  return (
+                    <div key={pack.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          {/* Pack Header */}
+                          <div className="flex items-center gap-3 mb-4">
+                            <h3 className="text-xl font-bold text-secondary-800 dark:text-gray-200">{pack.name}</h3>
+                            <span className="text-2xl font-bold text-green-600">${pack.price}</span>
+                            {/* Value Grade Badge */}
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${valueGrade.color}`}>
+                              {valueGrade.grade}
+                            </span>
+                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                            {pack.confirmation_count}/3 confirmations
+                          </span>
+                        </div>
+
+                        {/* Pack Summary */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 mb-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="text-secondary-500 dark:text-gray-400">Pack Cost:</span>
+                              <div className="font-bold text-lg text-green-700 dark:text-green-300">
+                                ${pack.price ? pack.price.toFixed(2) : '0.00'}
+                              </div>
+                            </div>
+                            {pack.energy_pots > 0 && (
+                              <div>
+                                <span className="text-secondary-500 dark:text-gray-400">Energy Pots:</span>
+                                <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.energy_pots}</div>
+                              </div>
+                            )}
+                            {pack.raw_energy > 0 && (
+                              <div>
+                                <span className="text-secondary-500 dark:text-gray-400">Raw Energy:</span>
+                                <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.raw_energy.toLocaleString()}</div>
+                              </div>
+                            )}
                           </div>
                         </div>
+
+                        {/* Pack Items */}
                         {pack.items && pack.items.length > 0 && (
-                          <div>
-                            <span className="text-secondary-500 dark:text-gray-400 text-sm">Items:</span>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {pack.items.map((item, index) => (
-                                <span key={index} className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded text-xs">
-                                  {item.itemTypeId}: {item.quantity}
-                                </span>
-                              ))}
+                          <div className="mb-4">
+                            <h4 className="text-sm font-semibold text-secondary-700 dark:text-gray-300 mb-2">📦 Pack Contents:</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {pack.items.map((item, index) => {
+                                const itemName = item.itemTypeId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                return (
+                                  <div key={index} className="flex justify-between items-center bg-white dark:bg-gray-700 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600">
+                                    <span className="font-medium text-gray-700 dark:text-gray-200">{itemName}</span>
+                                    <span className="font-bold text-primary-600 dark:text-primary-400">×{item.quantity}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
+
+                        {/* Submission Info */}
+                        <div className="flex items-center gap-4 text-xs text-secondary-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-600 pt-3">
+                          <span>📅 Submitted: {pack.submitted_at.toLocaleDateString()}</span>
+                          <span>👤 Submitter: {pack.submitter_email || `${pack.submitter_id.substring(0, 8)}...`}</span>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleApprovePack(pack.id!)}
-                        className="ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        Approve Now
-                      </button>
+                      <div className="flex gap-2 ml-4">
+                        <button
+                          onClick={() => handleApprovePack(pack.id!)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Approve Now
+                        </button>
+                        <button
+                          onClick={() => handleDeletePack(pack.id!, pack.name)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

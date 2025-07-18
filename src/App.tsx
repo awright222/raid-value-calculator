@@ -15,6 +15,7 @@ import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin'>('analyze');
+  console.log('🎯 App activeTab:', activeTab);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBiometricLogin, setShowBiometricLogin] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -68,10 +69,12 @@ function App() {
   };
 
   const handleTabClick = (tabId: 'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin') => {
+    console.log('🔄 Tab clicked:', tabId);
     if (tabId === 'admin' && !isAdminAuthenticated) {
       setShowBiometricLogin(true);
       setLoginError('');
     } else {
+      console.log('✅ Setting activeTab to:', tabId);
       setActiveTab(tabId);
     }
   };

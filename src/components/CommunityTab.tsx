@@ -3,12 +3,16 @@ import { motion } from 'framer-motion';
 import PackSubmission from './PackSubmission';
 import PendingPacks from './PendingPacks';
 
+console.log('📁 CommunityTab.tsx file loaded');
+
 interface CommunityTabProps {
   userEmail?: string;
 }
 
 export function CommunityTab({ userEmail }: CommunityTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<'submit' | 'pending'>('pending');
+  console.log('🏷️ CommunityTab activeSubTab:', activeSubTab);
+  
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSubmissionComplete = (success: boolean, message: string) => {
@@ -60,7 +64,10 @@ export function CommunityTab({ userEmail }: CommunityTabProps) {
           {subTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveSubTab(tab.id)}
+              onClick={() => {
+                console.log('🔄 Switching to tab:', tab.id);
+                setActiveSubTab(tab.id);
+              }}
               className={`relative px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
                 activeSubTab === tab.id
                   ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-lg'

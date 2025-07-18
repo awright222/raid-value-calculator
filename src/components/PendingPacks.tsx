@@ -68,6 +68,16 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
     return !pack.confirmations.includes(userId);
   };
 
+  // Helper function to calculate value grade
+  const getValueGrade = (costPerEnergy: number): { grade: string; color: string } => {
+    if (costPerEnergy <= 0.005) return { grade: 'S+', color: 'bg-purple-500 text-white' };
+    if (costPerEnergy <= 0.007) return { grade: 'S', color: 'bg-blue-500 text-white' };
+    if (costPerEnergy <= 0.009) return { grade: 'A', color: 'bg-green-500 text-white' };
+    if (costPerEnergy <= 0.012) return { grade: 'B', color: 'bg-yellow-500 text-white' };
+    if (costPerEnergy <= 0.015) return { grade: 'C', color: 'bg-orange-500 text-white' };
+    return { grade: 'D', color: 'bg-red-500 text-white' };
+  };
+
   const getTimeRemaining = (expiresAt: Date) => {
     const now = new Date();
     const diff = expiresAt.getTime() - now.getTime();
@@ -139,65 +149,83 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
         </div>
       ) : (
         <div className="space-y-6">
-          {pendingPacks.map((pack) => (
-            <motion.div
-              key={pack.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Pack Info */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-lg font-semibold text-secondary-800">{pack.name}</h3>
-                    <span className="text-2xl font-bold text-primary-600">${pack.price}</span>
-                  </div>
+          {pendingPacks.map((pack) => {
+            const valueGrade = getValueGrade(pack.cost_per_energy);
+            
+            return (
+              <motion.div
+                key={pack.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  {/* Pack Info */}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-lg font-semibold text-secondary-800 dark:text-gray-200">{pack.name}</h3>
+                      <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">${pack.price}</span>
+                      {/* Value Grade Badge */}
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${valueGrade.color}`}>
+                        {valueGrade.grade}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                    <div>
-                      <span className="text-secondary-500">Total Energy:</span>
-                      <div className="font-semibold text-secondary-700">{pack.total_energy.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <span className="text-secondary-500">Cost per Energy:</span>
-                      <div className="font-semibold text-secondary-700">${pack.cost_per_energy.toFixed(4)}</div>
-                    </div>
-                    <div>
-                      <span className="text-secondary-500">Energy Pots:</span>
-                      <div className="font-semibold text-secondary-700">{pack.energy_pots}</div>
-                    </div>
-                    <div>
-                      <span className="text-secondary-500">Raw Energy:</span>
-                      <div className="font-semibold text-secondary-700">{pack.raw_energy}</div>
-                    </div>
-                  </div>
-
-                  {pack.items && pack.items.length > 0 && (
-                    <div className="mb-4">
-                      <span className="text-secondary-500 text-sm">Additional Items:</span>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {pack.items.map((item, index) => (
-                          <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded text-xs">
-                            {item.itemTypeId}: {item.quantity}
-                          </span>
-                        ))}
+                    {/* Pack Summary */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-secondary-500 dark:text-gray-400">Pack Cost:</span>
+                          <div className="font-bold text-lg text-green-700 dark:text-green-300">
+                            ${pack.price ? pack.price.toFixed(2) : '0.00'}
+                          </div>
+                        </div>
+                        {pack.energy_pots > 0 && (
+                          <div>
+                            <span className="text-secondary-500 dark:text-gray-400">Energy Pots:</span>
+                            <div className="font-semibold text-secondary-700 dark:text-gray-200">{pack.energy_pots}</div>
+                          </div>
+                        )}
+                        {pack.raw_energy > 0 && (
+                          <div>
+                            <span className="text-secondary-500 dark:text-gray-400">Raw Energy:</span>
+                            <div className="font-semibold text-secondary-700 dark:text-gray-200">{pack.raw_energy.toLocaleString()}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  <div className="flex items-center gap-4 text-xs text-secondary-500">
-                    <span>Submitted: {pack.submitted_at.toLocaleDateString()}</span>
-                    <span>Expires: {getTimeRemaining(pack.expires_at)}</span>
-                    <span>Submitter: {pack.submitter_email || pack.submitter_id.substring(0, 8)}...</span>
-                  </div>
+                    {/* Pack Items */}
+                    {pack.items && pack.items.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-semibold text-secondary-700 dark:text-gray-300 mb-2">📦 Pack Contents:</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {pack.items.map((item, index) => {
+                            const itemName = item.itemTypeId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            return (
+                              <div key={index} className="flex justify-between items-center bg-white dark:bg-gray-700 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600">
+                                <span className="font-medium text-gray-700 dark:text-gray-200">{itemName}</span>
+                                <span className="font-bold text-primary-600 dark:text-primary-400">×{item.quantity}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submission Details */}
+                    <div className="flex items-center gap-4 text-xs text-secondary-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-600 pt-3">
+                      <span>📅 {pack.submitted_at.toLocaleDateString()}</span>
+                      <span>⏰ {getTimeRemaining(pack.expires_at)}</span>
+                      <span>👤 {pack.submitter_email || pack.submitter_id.substring(0, 8)}...</span>
+                    </div>
                 </div>
 
                 {/* Confirmation Status */}
                 <div className="flex flex-col items-center lg:items-end gap-3">
                   {/* Confirmation Progress */}
                   <div className="text-center lg:text-right">
-                    <div className="text-sm text-secondary-600 mb-2">
+                    <div className="text-sm text-secondary-600 dark:text-gray-300 mb-2">
                       Confirmations: {pack.confirmation_count}/3
                     </div>
                     <div className="flex gap-1">
@@ -205,7 +233,7 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
                         <div
                           key={i}
                           className={`w-3 h-3 rounded-full ${
-                            i < pack.confirmation_count ? 'bg-green-500' : 'bg-gray-200'
+                            i < pack.confirmation_count ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-600'
                           }`}
                         />
                       ))}
@@ -221,8 +249,8 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
                       whileTap={{ scale: 0.95 }}
                       className={`px-6 py-2 rounded-lg font-medium transition-all ${
                         confirmingPacks.has(pack.id!)
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-primary-600 text-white hover:bg-primary-700 shadow-md hover:shadow-lg'
+                          ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                          : 'bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 shadow-md hover:shadow-lg'
                       }`}
                     >
                       {confirmingPacks.has(pack.id!) ? (
@@ -235,14 +263,15 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
                       )}
                     </motion.button>
                   ) : (
-                    <div className="px-6 py-2 rounded-lg bg-gray-100 text-gray-600 font-medium">
+                    <div className="px-6 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium">
                       Already Confirmed
                     </div>
                   )}
                 </div>
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
 

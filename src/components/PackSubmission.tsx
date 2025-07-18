@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { submitPendingPack } from '../firebase/pendingPacks';
+import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById } from '../types/itemTypes';
 
 interface PackSubmissionProps {
   onSubmissionComplete?: (success: boolean, message: string) => void;
@@ -9,33 +9,16 @@ interface PackSubmissionProps {
 interface PackFormData {
   name: string;
   price: number;
-  energyPots: number;
-  rawEnergy: number;
   items: Array<{
     itemTypeId: string;
     quantity: number;
   }>;
 }
 
-const ITEM_TYPES = [
-  { id: 'silver', name: 'Silver' },
-  { id: 'xp_brew', name: 'XP Brew' },
-  { id: 'mystery_shard', name: 'Mystery Shard' },
-  { id: 'ancient_shard', name: 'Ancient Shard' },
-  { id: 'void_shard', name: 'Void Shard' },
-  { id: 'sacred_shard', name: 'Sacred Shard' },
-  { id: 'chicken', name: 'Chicken (Food)' },
-  { id: 'gem', name: 'Gems' },
-  { id: 'potion', name: 'Ascension Potion' },
-  { id: 'book', name: 'Skill Book' }
-];
-
 export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
   const [formData, setFormData] = useState<PackFormData>({
     name: '',
     price: 0,
-    energyPots: 0,
-    rawEnergy: 0,
     items: []
   });
   
@@ -43,8 +26,10 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
 
-  // Calculate totals
-  const totalEnergy = formData.energyPots * 130 + formData.rawEnergy;
+  // Calculate totals from items
+  const energyPots = formData.items.find(item => item.itemTypeId === 'energy_pot')?.quantity || 0;
+  const rawEnergy = formData.items.find(item => item.itemTypeId === 'raw_energy')?.quantity || 0;
+  const totalEnergy = energyPots * 130 + rawEnergy;
   const costPerEnergy = totalEnergy > 0 ? formData.price / totalEnergy : 0;
 
   const handleInputChange = (field: keyof PackFormData, value: any) => {
@@ -78,6 +63,9 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Show immediate feedback
+    setSubmitMessage({ type: 'success', text: 'Submitting pack...' });
+    
     if (!formData.name.trim()) {
       setSubmitMessage({ type: 'error', text: 'Pack name is required' });
       return;
@@ -88,8 +76,8 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       return;
     }
 
-    if (totalEnergy === 0 && formData.items.length === 0) {
-      setSubmitMessage({ type: 'error', text: 'Pack must contain at least some energy or items' });
+    if (formData.items.length === 0) {
+      setSubmitMessage({ type: 'error', text: 'Pack must contain at least one item' });
       return;
     }
 
@@ -100,50 +88,74 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      // Generate a simple user ID (in a real app, this would come from auth)
+      setIsSubmitting(true);
+      setSubmitMessage({ type: 'success', text: 'Submitting pack...' });
+      
+      // Use proper submission function that handles validation and signatures
+      const { submitPendingPack } = await import('../firebase/pendingPacks');
+      
       const userId = submitterEmail || `user_${Date.now()}`;
-
+      
       const packData = {
         name: formData.name.trim(),
         price: formData.price,
-        energy_pots: formData.energyPots,
-        raw_energy: formData.rawEnergy,
+        energy_pots: energyPots,
+        raw_energy: rawEnergy,
         total_energy: totalEnergy,
         cost_per_energy: costPerEnergy,
-        items: formData.items.length > 0 ? formData.items : undefined,
-        submitter_id: userId
+        items: formData.items.filter(item => item.itemTypeId && item.quantity > 0),
+        submitter_id: userId,
+        submitter_email: submitterEmail || ''
       };
-
-      const result = await submitPendingPack(packData, userId, submitterEmail || undefined);
-
+      
+      const result = await submitPendingPack(packData, userId, submitterEmail || '');
+      
       if (result.success) {
         setSubmitMessage({ 
-          type: result.duplicateFound ? 'warning' : 'success', 
-          text: result.message 
+          type: 'success', 
+          text: `✅ ${result.message}` 
         });
         
-        if (!result.duplicateFound) {
-          // Reset form on successful new submission
-          setFormData({
-            name: '',
-            price: 0,
-            energyPots: 0,
-            rawEnergy: 0,
-            items: []
-          });
-        }
+        // Reset form
+        setFormData({
+          name: '',
+          price: 0,
+          items: []
+        });
+        setSubmitterEmail('');
+        
+        onSubmissionComplete?.(true, result.message);
       } else {
-        setSubmitMessage({ type: 'error', text: result.message });
+        setSubmitMessage({ 
+          type: result.duplicateFound ? 'warning' : 'error',
+          text: result.message 
+        });
+        onSubmissionComplete?.(false, result.message);
       }
-
-      onSubmissionComplete?.(result.success, result.message);
 
     } catch (error) {
       console.error('Submission error:', error);
-      setSubmitMessage({ type: 'error', text: 'Failed to submit pack. Please try again.' });
+      
+      // Log more detailed error information
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        setSubmitMessage({ 
+          type: 'error', 
+          text: `Failed to submit pack: ${error.message}` 
+        });
+      } else {
+        console.error('Unknown error:', error);
+        setSubmitMessage({ 
+          type: 'error', 
+          text: 'Failed to submit pack. Please try again.' 
+        });
+      }
+      
       onSubmissionComplete?.(false, 'Failed to submit pack');
     } finally {
       setIsSubmitting(false);
@@ -168,10 +180,12 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Submitter Email */}
         <div>
-          <label className="block text-sm font-medium text-secondary-700 mb-2">
+          <label htmlFor="submitter-email" className="block text-sm font-medium text-secondary-700 mb-2">
             Your Email (Optional)
           </label>
           <input
+            id="submitter-email"
+            name="submitter-email"
             type="email"
             value={submitterEmail}
             onChange={(e) => setSubmitterEmail(e.target.value)}
@@ -185,10 +199,12 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
 
         {/* Pack Name */}
         <div>
-          <label className="block text-sm font-medium text-secondary-700 mb-2">
+          <label htmlFor="pack-name" className="block text-sm font-medium text-secondary-700 mb-2">
             Pack Name *
           </label>
           <input
+            id="pack-name"
+            name="pack-name"
             type="text"
             value={formData.name}
             onChange={(e) => handleInputChange('name', e.target.value)}
@@ -200,10 +216,12 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
 
         {/* Price */}
         <div>
-          <label className="block text-sm font-medium text-secondary-700 mb-2">
+          <label htmlFor="pack-price" className="block text-sm font-medium text-secondary-700 mb-2">
             Price (USD) *
           </label>
           <input
+            id="pack-price"
+            name="pack-price"
             type="number"
             step="0.01"
             min="0"
@@ -215,48 +233,17 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
           />
         </div>
 
-        {/* Energy Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Energy Pots
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={formData.energyPots || ''}
-              onChange={(e) => handleInputChange('energyPots', parseInt(e.target.value) || 0)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-              placeholder="0"
-            />
-            <p className="text-xs text-secondary-500 mt-1">Each pot = 130 energy</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Raw Energy
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={formData.rawEnergy || ''}
-              onChange={(e) => handleInputChange('rawEnergy', parseInt(e.target.value) || 0)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-              placeholder="0"
-            />
-          </div>
-        </div>
-
-        {/* Additional Items */}
+        {/* Pack Items */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <label className="block text-sm font-medium text-secondary-700">
-              Additional Items
+            <label id="pack-items-label" className="block text-sm font-medium text-secondary-700">
+              Pack Items
             </label>
             <button
               type="button"
               onClick={handleAddItem}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+              aria-describedby="pack-items-label"
             >
               + Add Item
             </button>
@@ -269,30 +256,51 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
               animate={{ opacity: 1, y: 0 }}
               className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-4 bg-gray-50 rounded-xl"
             >
-              <select
-                value={item.itemTypeId}
-                onChange={(e) => handleItemChange(index, 'itemTypeId', e.target.value)}
-                className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">Select item type</option>
-                {ITEM_TYPES.map(type => (
-                  <option key={type.id} value={type.id}>{type.name}</option>
-                ))}
-              </select>
+              <div>
+                <label htmlFor={`item-type-${index}`} className="sr-only">
+                  Item Type
+                </label>
+                <select
+                  id={`item-type-${index}`}
+                  name={`item-type-${index}`}
+                  value={item.itemTypeId}
+                  onChange={(e) => handleItemChange(index, 'itemTypeId', e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
+                >
+                  <option value="">Select item type</option>
+                  {Object.entries(ITEM_CATEGORIES).map(([categoryKey, categoryName]) => (
+                    <optgroup key={categoryKey} label={categoryName}>
+                      {getItemTypesByCategory(categoryName).map(itemType => (
+                        <option key={itemType.id} value={itemType.id}>
+                          {itemType.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
 
-              <input
-                type="number"
-                min="1"
-                value={item.quantity || ''}
-                onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                placeholder="Quantity"
-                className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
+              <div>
+                <label htmlFor={`item-quantity-${index}`} className="sr-only">
+                  Quantity
+                </label>
+                <input
+                  id={`item-quantity-${index}`}
+                  name={`item-quantity-${index}`}
+                  type="number"
+                  min="1"
+                  value={item.quantity || ''}
+                  onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                  placeholder="Quantity"
+                  className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
+                />
+              </div>
 
               <button
                 type="button"
                 onClick={() => handleRemoveItem(index)}
                 className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                aria-label={`Remove item ${index + 1}`}
               >
                 Remove
               </button>
@@ -301,42 +309,45 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
         </div>
 
         {/* Pack Summary */}
-        {(totalEnergy > 0 || formData.items.length > 0) && (
+        {(formData.price > 0 || formData.items.length > 0) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200"
           >
             <h3 className="text-lg font-semibold text-secondary-700 mb-3">Pack Summary</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
-                <span className="text-secondary-500">Total Energy:</span>
-                <div className="font-semibold text-secondary-700">{totalEnergy.toLocaleString()}</div>
-              </div>
-              <div>
-                <span className="text-secondary-500">Cost per Energy:</span>
+                <span className="text-secondary-500">Pack Cost:</span>
                 <div className="font-semibold text-secondary-700">
-                  ${costPerEnergy.toFixed(4)}
+                  ${(formData.price && isFinite(formData.price)) ? formData.price.toFixed(2) : '0.00'}
                 </div>
               </div>
-              <div>
-                <span className="text-secondary-500">Energy Pots:</span>
-                <div className="font-semibold text-secondary-700">{formData.energyPots}</div>
-              </div>
-              <div>
-                <span className="text-secondary-500">Raw Energy:</span>
-                <div className="font-semibold text-secondary-700">{formData.rawEnergy}</div>
-              </div>
+              {energyPots > 0 && (
+                <div>
+                  <span className="text-secondary-500">Energy Pots:</span>
+                  <div className="font-semibold text-secondary-700">{energyPots}</div>
+                </div>
+              )}
+              {rawEnergy > 0 && (
+                <div>
+                  <span className="text-secondary-500">Raw Energy:</span>
+                  <div className="font-semibold text-secondary-700">{rawEnergy.toLocaleString()}</div>
+                </div>
+              )}
             </div>
             {formData.items.length > 0 && (
               <div className="mt-3">
-                <span className="text-secondary-500">Additional Items:</span>
+                <span className="text-secondary-500">Pack Items:</span>
                 <div className="mt-1">
-                  {formData.items.map((item, index) => (
-                    <span key={index} className="inline-block bg-white px-2 py-1 rounded mr-2 mb-1 text-xs">
-                      {ITEM_TYPES.find(t => t.id === item.itemTypeId)?.name || item.itemTypeId}: {item.quantity}
-                    </span>
-                  ))}
+                  {formData.items.map((item, index) => {
+                    const itemType = getItemTypeById(item.itemTypeId);
+                    return (
+                      <span key={index} className="inline-block bg-white px-2 py-1 rounded mr-2 mb-1 text-xs">
+                        {itemType?.name || item.itemTypeId}: {item.quantity}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}

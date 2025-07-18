@@ -84,7 +84,7 @@ function PriceHistoryItem({ snapshot }: PriceHistoryItemProps) {
             {snapshot.itemName}
           </h4>
           <div className={`text-2xl font-bold text-blue-500 mt-1`}>
-            ${snapshot.price.toFixed(4)}
+            ${(snapshot.price && isFinite(snapshot.price)) ? snapshot.price.toFixed(4) : '0.0000'}
           </div>
           <div className={`text-sm ${
             isDark ? 'text-gray-400' : 'text-gray-600'
@@ -164,7 +164,7 @@ function PackHistoryItem({ pack }: PackHistoryItemProps) {
           <div className={`font-semibold ${
             isDark ? 'text-white' : 'text-gray-900'
           }`}>
-            ${pack.costPerEnergy.toFixed(4)}
+            ${(pack.costPerEnergy && isFinite(pack.costPerEnergy)) ? pack.costPerEnergy.toFixed(4) : '0.0000'}
           </div>
         </div>
         <div>
@@ -174,7 +174,7 @@ function PackHistoryItem({ pack }: PackHistoryItemProps) {
           <div className={`font-semibold ${
             isDark ? 'text-white' : 'text-gray-900'
           }`}>
-            {pack.betterThanPercent.toFixed(1)}%
+            {(pack.betterThanPercent && isFinite(pack.betterThanPercent)) ? pack.betterThanPercent.toFixed(1) : '0.0'}%
           </div>
         </div>
       </div>
@@ -286,7 +286,7 @@ export default function MarketTrends() {
               value={weeklyTrend?.averageGrade || 'N/A'}
               change={`${weeklyTrend?.totalPacksAnalyzed || 0} packs analyzed`}
               changeType="neutral"
-              subtitle={weeklyTrend ? `$${weeklyTrend.averageCostPerEnergy.toFixed(4)} per energy` : undefined}
+              subtitle={weeklyTrend ? `$${(weeklyTrend.averageCostPerEnergy && isFinite(weeklyTrend.averageCostPerEnergy)) ? weeklyTrend.averageCostPerEnergy.toFixed(4) : '0.0000'} per energy` : undefined}
             />
             
             <TrendCard
@@ -294,13 +294,13 @@ export default function MarketTrends() {
               value={monthlyTrend?.averageGrade || 'N/A'}
               change={`${monthlyTrend?.totalPacksAnalyzed || 0} packs analyzed`}
               changeType="neutral"
-              subtitle={monthlyTrend ? `$${monthlyTrend.averageCostPerEnergy.toFixed(4)} per energy` : undefined}
+              subtitle={monthlyTrend ? `$${(monthlyTrend.averageCostPerEnergy && isFinite(monthlyTrend.averageCostPerEnergy)) ? monthlyTrend.averageCostPerEnergy.toFixed(4) : '0.0000'} per energy` : undefined}
             />
             
             <TrendCard
               title="Best Weekly Deal"
               value={weeklyTrend?.bestDeal.grade || 'N/A'}
-              change={weeklyTrend ? `$${weeklyTrend.bestDeal.costPerEnergy.toFixed(4)} per energy` : 'No data'}
+              change={weeklyTrend ? `$${(weeklyTrend.bestDeal.costPerEnergy && isFinite(weeklyTrend.bestDeal.costPerEnergy)) ? weeklyTrend.bestDeal.costPerEnergy.toFixed(4) : '0.0000'} per energy` : 'No data'}
               changeType="positive"
               subtitle={weeklyTrend ? weeklyTrend.bestDeal.packName : undefined}
             />

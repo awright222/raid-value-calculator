@@ -44,6 +44,20 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
     loadItemPrices();
   }, []);
 
+  const getGradeColor = (grade: string) => {
+    switch (grade) {
+      case 'SSS': return 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white shadow-2xl border-2 border-pink-300';
+      case 'S+': return 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white';
+      case 'S': return 'bg-gradient-to-r from-green-400 to-green-500 text-white';
+      case 'A': return 'bg-gradient-to-r from-blue-400 to-blue-500 text-white';
+      case 'B': return 'bg-gradient-to-r from-purple-400 to-purple-500 text-white';
+      case 'C': return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white';
+      case 'D': return 'bg-gradient-to-r from-orange-400 to-red-400 text-white';
+      case 'F': return 'bg-gradient-to-r from-red-500 to-red-600 text-white';
+      default: return 'bg-gray-300 text-gray-700';
+    }
+  };
+
   const loadItemPrices = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -110,20 +124,62 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       quantity: number;
       marketValue: number;
       energyEquivalent: number;
+      valueGrade: string;
+      valueRating: string;
+      costPerUnit: number;
+      marketPricePerUnit: number;
     }> = [];
 
     packItems.forEach(item => {
       const itemType = getItemTypeById(item.itemTypeId);
-      const pricePerItem = itemPrices[item.itemTypeId] || 0;
-      const itemMarketValue = item.quantity * pricePerItem;
+      const marketPricePerUnit = itemPrices[item.itemTypeId] || 0;
+      const itemMarketValue = item.quantity * marketPricePerUnit;
       
       totalMarketValue += itemMarketValue;
+      
+      // Calculate individual item value grade
+      const actualPrice = parseFloat(price) || 0;
+      const costPerUnit = actualPrice > 0 ? (actualPrice / packItems.reduce((sum, pi) => sum + pi.quantity, 0)) : 0;
+      
+      let valueGrade = 'C';
+      let valueRating = 'Fair Value';
+      
+      if (marketPricePerUnit > 0 && costPerUnit > 0) {
+        const valueRatio = marketPricePerUnit / costPerUnit;
+        
+        if (valueRatio >= 2.0) {
+          valueGrade = 'S+';
+          valueRating = 'Exceptional Deal';
+        } else if (valueRatio >= 1.5) {
+          valueGrade = 'S';
+          valueRating = 'Amazing Value';
+        } else if (valueRatio >= 1.3) {
+          valueGrade = 'A';
+          valueRating = 'Great Deal';
+        } else if (valueRatio >= 1.1) {
+          valueGrade = 'B';
+          valueRating = 'Good Value';
+        } else if (valueRatio >= 0.9) {
+          valueGrade = 'C';
+          valueRating = 'Fair Value';
+        } else if (valueRatio >= 0.7) {
+          valueGrade = 'D';
+          valueRating = 'Poor Value';
+        } else {
+          valueGrade = 'F';
+          valueRating = 'Bad Deal';
+        }
+      }
       
       itemBreakdown.push({
         itemType,
         quantity: item.quantity,
         marketValue: itemMarketValue,
-        energyEquivalent: itemType?.baseValue ? item.quantity * itemType.baseValue : 0
+        energyEquivalent: itemType?.baseValue ? item.quantity * itemType.baseValue : 0,
+        valueGrade,
+        valueRating,
+        costPerUnit,
+        marketPricePerUnit
       });
     });
 
@@ -285,7 +341,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <motion.h2 
-              className="text-3xl font-bold bg-gradient-to-r from-secondary-900 to-primary-700 bg-clip-text text-transparent"
+              className="text-3xl font-bold bg-gradient-to-r from-secondary-700 to-primary-600 bg-clip-text text-transparent"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
             >
@@ -417,16 +473,18 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <p className="font-medium text-primary-700">Market Value: ${valueAnalysis.totalMarketValue.toFixed(2)}</p>
+                            <p className="font-medium text-primary-700">
+                              Market Value: ${(valueAnalysis.totalMarketValue && isFinite(valueAnalysis.totalMarketValue)) ? valueAnalysis.totalMarketValue.toFixed(2) : '0.00'}
+                            </p>
                             <p className="text-xs text-primary-600">Based on typical market rates</p>
                           </div>
                           <div>
                             <p className="font-medium text-primary-700">
-                              Value Ratio: {valueAnalysis.valueVsMarket > 0 ? `${valueAnalysis.valueVsMarket.toFixed(2)}x` : 'N/A'}
+                              Value Ratio: {valueAnalysis.valueVsMarket > 0 ? `${(valueAnalysis.valueVsMarket && isFinite(valueAnalysis.valueVsMarket)) ? valueAnalysis.valueVsMarket.toFixed(2) : '0.00'}x` : 'N/A'}
                             </p>
                             <p className="text-xs text-primary-600">
-                              {valueAnalysis.discountPercent > 0 ? `${valueAnalysis.discountPercent.toFixed(1)}% discount` : 
-                               valueAnalysis.discountPercent < 0 ? `${Math.abs(valueAnalysis.discountPercent).toFixed(1)}% premium` : 'At market price'}
+                              {valueAnalysis.discountPercent > 0 ? `${(valueAnalysis.discountPercent && isFinite(valueAnalysis.discountPercent)) ? valueAnalysis.discountPercent.toFixed(1) : '0.0'}% discount` : 
+                               valueAnalysis.discountPercent < 0 ? `${Math.abs(valueAnalysis.discountPercent && isFinite(valueAnalysis.discountPercent) ? valueAnalysis.discountPercent : 0).toFixed(1)}% premium` : 'At market price'}
                             </p>
                           </div>
                         </div>
@@ -491,7 +549,12 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                 className="space-y-8"
               >
                 <div className="glass-effect rounded-2xl p-8">
-                  <h3 className="text-2xl font-bold text-secondary-900 mb-6">Analysis Results</h3>
+                  <h3 className="text-2xl font-bold text-secondary-700 dark:text-gray-200 mb-6">Analysis Results</h3>
+                  
+                  {/* Pack Grade - Prominently displayed at top */}
+                  <div className="mb-8">
+                    <GradeDisplay grade={result.grade} />
+                  </div>
                   
                   {(() => {
                     const valueAnalysis = getPackValueAnalysis();
@@ -518,7 +581,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                           >
                             <p className="text-xs font-semibold text-secondary-600 mb-2">Market Value</p>
                             <p className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                              ${valueAnalysis.totalMarketValue.toFixed(2)}
+                              ${(valueAnalysis.totalMarketValue && isFinite(valueAnalysis.totalMarketValue)) ? valueAnalysis.totalMarketValue.toFixed(2) : '0.00'}
                             </p>
                           </motion.div>
                           <motion.div 
@@ -531,7 +594,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                               valueAnalysis.valueVsMarket > 1.0 ? 'from-yellow-600 to-yellow-700' :
                               'from-red-600 to-red-700'
                             }`}>
-                              {valueAnalysis.valueVsMarket > 0 ? `${valueAnalysis.valueVsMarket.toFixed(2)}x` : 'N/A'}
+                              {valueAnalysis.valueVsMarket > 0 ? `${(valueAnalysis.valueVsMarket && isFinite(valueAnalysis.valueVsMarket)) ? valueAnalysis.valueVsMarket.toFixed(2) : '0.00'}x` : 'N/A'}
                             </p>
                           </motion.div>
                           <motion.div 
@@ -548,25 +611,76 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                         </div>
 
                         {hasNonEnergyItems && (
-                          <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200/50 rounded-xl">
-                            <h4 className="text-lg font-bold text-purple-900 mb-4">Item Breakdown</h4>
-                            <div className="space-y-3">
+                          <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200/50 dark:border-purple-700/50 rounded-xl">
+                            <h4 className="text-lg font-bold text-purple-700 dark:text-purple-300 mb-4">📊 Individual Item Analysis</h4>
+                            <div className="space-y-4">
                               {valueAnalysis.itemBreakdown.map((item, index) => (
-                                <div key={index} className="flex justify-between items-center p-3 bg-white/60 rounded-lg">
-                                  <div>
-                                    <span className="font-medium text-secondary-900">{item.quantity}x {item.itemType.name}</span>
-                                    <span className="text-sm text-secondary-600 ml-2">({item.itemType.category})</span>
-                                  </div>
-                                  <div className="flex items-center space-x-4">
-                                    <div className="text-right">
-                                      <div className="font-bold text-secondary-900">${item.marketValue.toFixed(2)}</div>
-                                      <div className="text-xs text-secondary-600">{item.energyEquivalent.toLocaleString()} energy equiv.</div>
+                                <div key={index} className="bg-white/80 dark:bg-gray-800/80 rounded-lg border border-purple-100 dark:border-purple-700/50">
+                                  <div className="p-4">
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="font-semibold text-secondary-700 dark:text-gray-200">
+                                            {item.quantity}x {item.itemType.name}
+                                          </span>
+                                          <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-800/60 text-purple-700 dark:text-purple-300 rounded-full">
+                                            {item.itemType.category}
+                                          </span>
+                                        </div>
+                                        <div className="text-sm text-secondary-600 dark:text-gray-400">
+                                          {item.energyEquivalent.toLocaleString()} energy equivalent
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="font-bold text-lg text-secondary-700 dark:text-gray-200">
+                                          ${(item.marketValue && isFinite(item.marketValue)) ? item.marketValue.toFixed(2) : '0.00'}
+                                        </div>
+                                        <div className="text-xs text-secondary-500 dark:text-gray-400">Market Value</div>
+                                      </div>
                                     </div>
+                                    
+                                    {/* Item Value Analysis */}
+                                    <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800/50 dark:to-blue-900/20 rounded-lg p-3 mb-3">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-secondary-700 dark:text-gray-200">Item Value Rating:</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${getGradeColor(item.valueGrade)}`}>
+                                            {item.valueGrade}
+                                          </span>
+                                          <span className="text-sm font-medium text-secondary-700 dark:text-gray-200">{item.valueRating}</span>
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4 text-xs">
+                                        <div>
+                                          <span className="text-secondary-500 dark:text-gray-400">Your Cost:</span>
+                                          <div className="font-semibold text-secondary-700 dark:text-gray-200">
+                                            ${(item.costPerUnit && isFinite(item.costPerUnit)) ? item.costPerUnit.toFixed(3) : '0.000'} each
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <span className="text-secondary-500 dark:text-gray-400">Market Price:</span>
+                                          <div className="font-semibold text-secondary-700 dark:text-gray-200">
+                                            ${(item.marketPricePerUnit && isFinite(item.marketPricePerUnit)) ? item.marketPricePerUnit.toFixed(3) : '0.000'} each
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
                                     {itemStats[item.itemType.id] && (
-                                      <ConfidenceIndicator 
-                                        totalQuantity={itemStats[item.itemType.id].totalQuantity}
-                                        packCount={itemStats[item.itemType.id].packCount}
-                                      />
+                                      <div className="pt-3 border-t border-purple-100 dark:border-purple-700/50">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-xs text-secondary-500 dark:text-gray-400">Price Data Confidence:</span>
+                                          <ConfidenceIndicator 
+                                            totalQuantity={itemStats[item.itemType.id].totalQuantity}
+                                            packCount={itemStats[item.itemType.id].packCount}
+                                            className="scale-75"
+                                          />
+                                        </div>
+                                        <div className="text-xs text-secondary-400 dark:text-gray-500 mt-1">
+                                          Based on {itemStats[item.itemType.id].packCount} pack{itemStats[item.itemType.id].packCount !== 1 ? 's' : ''} 
+                                          ({itemStats[item.itemType.id].totalQuantity.toLocaleString()} items)
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -579,23 +693,19 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                   })()}
 
                   {result.total_energy > 0 && (
-                    <>
-                      <GradeDisplay grade={result.grade} />
-
-                      <div className="mt-8 p-6 glass-effect rounded-xl">
-                        <p className="text-lg font-semibold text-center">
-                          <span className="bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent">
-                            This pack is better than {result.comparison.better_than_percent}%
-                          </span>
-                          <span className="text-secondary-700"> of the {result.comparison.total_packs_compared} packs in our database.</span>
-                        </p>
-                      </div>
-                    </>
+                    <div className="mt-8 p-6 glass-effect rounded-xl">
+                      <p className="text-lg font-semibold text-center">
+                        <span className="bg-gradient-to-r from-primary-600 to-primary-700 bg-clip-text text-transparent">
+                          This pack is better than {result.comparison.better_than_percent}%
+                        </span>
+                        <span className="text-secondary-700 dark:text-gray-200"> of the {result.comparison.total_packs_compared} packs in our database.</span>
+                      </p>
+                    </div>
                   )}
 
                   {result.total_energy === 0 && (
                     <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200/50 rounded-xl">
-                      <h4 className="text-lg font-bold text-yellow-900 mb-2">New Item Analysis</h4>
+                      <h4 className="text-lg font-bold text-yellow-700 dark:text-yellow-300 mb-2">New Item Analysis</h4>
                       <p className="text-yellow-800">
                         This pack contains non-energy items. Value analysis is based on estimated market rates. 
                         {(() => {
@@ -610,32 +720,6 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                     </div>
                   )}
                 </div>
-
-                {result.similar_packs.length > 0 && (
-                  <div className="glass-effect rounded-2xl p-8">
-                    <h4 className="text-xl font-bold text-secondary-900 mb-6">Similar Value Packs</h4>
-                    <div className="space-y-4">
-                      {result.similar_packs.map((pack, index) => (
-                        <motion.div 
-                          key={index} 
-                          className="card p-6 flex justify-between items-center floating-card"
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                        >
-                          <div>
-                            <p className="font-semibold text-secondary-900 text-lg">{pack.name}</p>
-                            <p className="text-lg font-bold text-primary-600">${pack.price}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-secondary-600">Cost per Energy</p>
-                            <p className="font-bold text-xl text-accent-600">${pack.cost_per_energy.toFixed(5)}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </motion.div>
             )}
 

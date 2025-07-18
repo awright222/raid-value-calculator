@@ -138,7 +138,9 @@ export const PackIntelligence: React.FC<PackIntelligenceProps> = ({ packName }) 
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-green-800">Average Value</h3>
-                <p className="text-2xl font-bold text-green-600">${evolution.analytics.averageValue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-600">
+                  ${(evolution.analytics.averageValue && isFinite(evolution.analytics.averageValue)) ? evolution.analytics.averageValue.toFixed(2) : '0.00'}
+                </p>
               </div>
               <div className="bg-purple-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-purple-800">Popularity Score</h3>
@@ -224,7 +226,7 @@ export const PackIntelligence: React.FC<PackIntelligenceProps> = ({ packName }) 
                           ${version.price}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          ${version.totalValue.toFixed(2)}
+                          ${(version.totalValue && isFinite(version.totalValue)) ? version.totalValue.toFixed(2) : '0.00'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -264,7 +266,7 @@ export const PackIntelligence: React.FC<PackIntelligenceProps> = ({ packName }) 
                     ></div>
                   </div>
                   <span className="text-sm font-medium text-blue-700">
-                    {evolution.analytics.priceStability.toFixed(1)}%
+                    {(evolution.analytics.priceStability && isFinite(evolution.analytics.priceStability)) ? evolution.analytics.priceStability.toFixed(1) : '0.0'}%
                   </span>
                 </div>
               </div>
@@ -279,7 +281,7 @@ export const PackIntelligence: React.FC<PackIntelligenceProps> = ({ packName }) 
                     ></div>
                   </div>
                   <span className="text-sm font-medium text-green-700">
-                    {evolution.analytics.contentStability.toFixed(1)}%
+                    {(evolution.analytics.contentStability && isFinite(evolution.analytics.contentStability)) ? evolution.analytics.contentStability.toFixed(1) : '0.0'}%
                   </span>
                 </div>
               </div>
