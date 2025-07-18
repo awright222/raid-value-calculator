@@ -64,7 +64,7 @@ export function CommunityTab({ userEmail }: CommunityTabProps) {
               className={`relative px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
                 activeSubTab === tab.id
                   ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-lg'
-                  : 'text-secondary-600 hover:bg-white/50 hover:text-primary-600'
+                  : 'text-secondary-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 hover:text-primary-600 dark:hover:text-primary-400'
               }`}
             >
               <div className="flex items-center space-x-2">
@@ -110,46 +110,46 @@ export function CommunityTab({ userEmail }: CommunityTabProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="glass-effect rounded-2xl p-6 shadow-xl bg-gradient-to-r from-blue-50 to-indigo-50"
+        className="glass-effect dark:bg-gray-800/30 rounded-2xl p-6 shadow-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700"
       >
-        <h3 className="text-lg font-semibold text-secondary-700 mb-3 flex items-center">
+        <h3 className="text-lg font-semibold text-secondary-700 dark:text-gray-200 mb-3 flex items-center">
           <span className="mr-2">🏘️</span>
           How Community Submissions Work
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-secondary-600">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-secondary-600 dark:text-gray-300">
           <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold text-xs flex-shrink-0">
+            <div className="w-8 h-8 bg-primary-100 dark:bg-primary-800 rounded-full flex items-center justify-center text-primary-600 dark:text-primary-300 font-bold text-xs flex-shrink-0">
               1
             </div>
             <div>
-              <div className="font-medium mb-1">Submit Pack Data</div>
+              <div className="font-medium mb-1 text-gray-900 dark:text-gray-100">Submit Pack Data</div>
               <div>Users submit pack information including price, energy, and additional items.</div>
             </div>
           </div>
           <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold text-xs flex-shrink-0">
+            <div className="w-8 h-8 bg-primary-100 dark:bg-primary-800 rounded-full flex items-center justify-center text-primary-600 dark:text-primary-300 font-bold text-xs flex-shrink-0">
               2
             </div>
             <div>
-              <div className="font-medium mb-1">Community Review</div>
+              <div className="font-medium mb-1 text-gray-900 dark:text-gray-100">Community Review</div>
               <div>Other users confirm the pack data. Duplicates are automatically detected and merged.</div>
             </div>
           </div>
           <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-bold text-xs flex-shrink-0">
+            <div className="w-8 h-8 bg-primary-100 dark:bg-primary-800 rounded-full flex items-center justify-center text-primary-600 dark:text-primary-300 font-bold text-xs flex-shrink-0">
               3
             </div>
             <div>
-              <div className="font-medium mb-1">Auto-Approval</div>
+              <div className="font-medium mb-1 text-gray-900 dark:text-gray-100">Auto-Approval</div>
               <div>Packs with 3+ confirmations are automatically added to the main database.</div>
             </div>
           </div>
         </div>
         
-        <div className="mt-4 p-3 bg-white/50 rounded-lg">
-          <div className="text-xs text-secondary-500 flex items-center">
+        <div className="mt-4 p-3 bg-white/50 dark:bg-gray-700/50 rounded-lg border border-gray-200/50 dark:border-gray-600/50">
+          <div className="text-xs text-secondary-500 dark:text-gray-400 flex items-center">
             <span className="mr-2">🛡️</span>
-            <strong className="mr-1">Quality Control:</strong> 
+            <strong className="mr-1 text-secondary-700 dark:text-gray-300">Quality Control:</strong> 
             Suspicious data is flagged, duplicates are merged, and packs expire if not confirmed within 7 days.
           </div>
         </div>

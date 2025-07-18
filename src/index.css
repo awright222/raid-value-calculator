@@ -8,13 +8,13 @@
   }
   
   body {
-    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen antialiased;
+    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 min-h-screen antialiased transition-colors duration-300;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-white/20 backdrop-saturate-150;
+    @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-white/20 dark:border-gray-700/30 backdrop-saturate-150;
   }
   
   .btn-primary {
@@ -22,11 +22,11 @@
   }
   
   .btn-secondary {
-    @apply bg-white/80 backdrop-blur-sm hover:bg-white/90 text-secondary-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-secondary-500/50 focus:ring-offset-2 shadow-lg hover:shadow-xl border border-secondary-200/50 transform hover:scale-105 active:scale-95;
+    @apply bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm hover:bg-white/90 dark:hover:bg-gray-700/90 text-secondary-700 dark:text-gray-200 font-semibold py-3 px-6 rounded-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-secondary-500/50 focus:ring-offset-2 shadow-lg hover:shadow-xl border border-secondary-200/50 dark:border-gray-600/50 transform hover:scale-105 active:scale-95;
   }
   
   .input-field {
-    @apply w-full px-4 py-3 bg-white/80 backdrop-blur-sm border border-secondary-200/50 rounded-xl focus:ring-4 focus:ring-primary-500/50 focus:border-primary-500 transition-all duration-300 shadow-sm hover:shadow-md placeholder-secondary-400;
+    @apply w-full px-4 py-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-secondary-200/50 dark:border-gray-600/50 rounded-xl focus:ring-4 focus:ring-primary-500/50 focus:border-primary-500 transition-all duration-300 shadow-sm hover:shadow-md placeholder-secondary-400 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100;
   }
   
   .grade-s {
@@ -50,14 +50,14 @@
   }
   
   .glass-effect {
-    @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-xl;
+    @apply bg-white/10 dark:bg-gray-900/30 backdrop-blur-md border border-white/20 dark:border-gray-700/50 shadow-xl;
   }
   
   .floating-card {
-    @apply transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-primary-500/10;
+    @apply transform hover:scale-105 transition-all duration-500 hover:shadow-2xl hover:shadow-primary-500/10 dark:hover:shadow-primary-400/20;
   }
   
   .glow-effect {
-    @apply shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/40 transition-shadow duration-300;
+    @apply shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/40 dark:shadow-primary-400/20 dark:hover:shadow-primary-400/30 transition-shadow duration-300;
   }
 }

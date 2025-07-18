@@ -361,34 +361,34 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
             ) : (
               <div className="space-y-4">
                 {pendingPacks.map((pack) => (
-                  <div key={pack.id} className="bg-white rounded-xl p-6 border border-gray-200">
+                  <div key={pack.id} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-secondary-800 mb-2">{pack.name}</h3>
+                        <h3 className="text-lg font-semibold text-secondary-800 dark:text-gray-200 mb-2">{pack.name}</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                           <div>
-                            <span className="text-secondary-500">Price:</span>
-                            <div className="font-semibold">${pack.price}</div>
+                            <span className="text-secondary-500 dark:text-gray-400">Price:</span>
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">${pack.price}</div>
                           </div>
                           <div>
-                            <span className="text-secondary-500">Energy:</span>
-                            <div className="font-semibold">{pack.total_energy.toLocaleString()}</div>
+                            <span className="text-secondary-500 dark:text-gray-400">Energy:</span>
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.total_energy.toLocaleString()}</div>
                           </div>
                           <div>
-                            <span className="text-secondary-500">Confirmations:</span>
-                            <div className="font-semibold">{pack.confirmation_count}/3</div>
+                            <span className="text-secondary-500 dark:text-gray-400">Confirmations:</span>
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.confirmation_count}/3</div>
                           </div>
                           <div>
-                            <span className="text-secondary-500">Submitted:</span>
-                            <div className="font-semibold">{pack.submitted_at.toLocaleDateString()}</div>
+                            <span className="text-secondary-500 dark:text-gray-400">Submitted:</span>
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">{pack.submitted_at.toLocaleDateString()}</div>
                           </div>
                         </div>
                         {pack.items && pack.items.length > 0 && (
                           <div>
-                            <span className="text-secondary-500 text-sm">Items:</span>
+                            <span className="text-secondary-500 dark:text-gray-400 text-sm">Items:</span>
                             <div className="mt-1 flex flex-wrap gap-1">
                               {pack.items.map((item, index) => (
-                                <span key={index} className="inline-block bg-gray-100 px-2 py-1 rounded text-xs">
+                                <span key={index} className="inline-block bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded text-xs">
                                   {item.itemTypeId}: {item.quantity}
                                 </span>
                               ))}

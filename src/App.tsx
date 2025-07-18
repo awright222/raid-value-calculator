@@ -66,7 +66,7 @@ function App() {
   const tabs = [...baseTabs, adminTab];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 transition-colors duration-300">
       <Header 
         isAdminAuthenticated={isAdminAuthenticated} 
         onLogout={handleAdminLogout}
@@ -75,7 +75,7 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         {/* Tab Navigation */}
         <div className="flex justify-center mb-8">
-          <div className="glass-effect rounded-2xl p-2 shadow-2xl">
+          <div className="glass-effect dark:bg-gray-800/30 dark:border-gray-700/50 rounded-2xl p-2 shadow-2xl">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -83,7 +83,7 @@ function App() {
                 className={`relative px-8 py-4 rounded-xl font-semibold transition-all duration-300 ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-xl glow-effect'
-                    : 'text-secondary-600 hover:bg-white/50 hover:text-primary-600'
+                    : 'text-secondary-600 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 hover:text-primary-600 dark:hover:text-primary-400'
                 }`}
               >
                 <span className="mr-3 text-lg">{tab.icon}</span>
