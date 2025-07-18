@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { getAllPacks } from '../firebase/database';
+import { savePriceSnapshot } from '../firebase/historical';
+import { calculateItemPrices, clearPricingCache } from '../services/pricingService';
 import { ITEM_TYPES, getItemTypeById } from '../types/itemTypes';
 import ConfidenceIndicator from './ConfidenceIndicator';
 
@@ -33,174 +34,9 @@ export default function ItemValues() {
         setLoading(true);
       }
 
-      const packs = await getAllPacks();
-      console.log('Loading item values from', packs.length, 'packs');
-      setTotalPacks(packs.length);
-      
-      // Filter packs that have items data (include ALL items, not just energy items)
-      const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0);
-      const packsWithoutItems = packs.filter(pack => !pack.items || pack.items.length === 0);
-      const energyPacks = packs.filter(pack => pack.items && pack.items.length > 0 && pack.total_energy > 0);
-      const nonEnergyPacks = packs.filter(pack => pack.items && pack.items.length > 0 && pack.total_energy === 0);
-      
-      console.log('Packs with items data (all types):', packsWithItems.length);
-      console.log('Packs without items data:', packsWithoutItems.length);
-      console.log('Energy packs:', energyPacks.length);
-      console.log('Non-energy packs (shards, tomes, etc.):', nonEnergyPacks.length);
-      
-      if (nonEnergyPacks.length > 0) {
-        console.log('Sample non-energy pack:', nonEnergyPacks[0]);
-        console.log('Items in non-energy pack:', nonEnergyPacks[0].items);
-      }
-      
-      // Debug: Check pack structure
-      if (packsWithItems.length > 0) {
-        console.log('Sample pack with items:', packsWithItems[0]);
-        console.log('Items in first pack:', packsWithItems[0].items);
-      }
-      
-      let itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = {};
-      let currentPrices: Record<string, number> = {};
-
-      // Step 1: Get baseline prices from single-item packs (these are definitive for ANY item type)
-      let singleItemPackCount = 0;
-      packsWithItems.forEach(pack => {
-        if (!pack.items || pack.items.length !== 1) return;
-        
-        singleItemPackCount++;
-        const item = pack.items[0];
-        if (!itemStats[item.itemTypeId]) {
-          itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
-        }
-        
-        itemStats[item.itemTypeId].totalCost += pack.price;
-        itemStats[item.itemTypeId].totalQuantity += item.quantity;
-        itemStats[item.itemTypeId].packCount += 1;
-      });
-      
-      console.log('Found', singleItemPackCount, 'single-item packs establishing baseline prices');
-      console.log('Baseline prices established for:', Object.keys(itemStats).length, 'item types');
-
-      // Calculate baseline prices from single-item packs
-      Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
-        currentPrices[itemTypeId] = stats.totalCost / stats.totalQuantity;
-        console.log(`Baseline: ${getItemTypeById(itemTypeId)?.name || itemTypeId} = $${(stats.totalCost / stats.totalQuantity).toFixed(4)}`);
-      });
-
-      // Step 2: Iteratively calculate unknown item prices from multi-item packs
-      // This will discover new item prices and refine existing ones
-      const multiItemPacks = packsWithItems.filter(pack => pack.items && pack.items.length > 1);
-      console.log('Processing', multiItemPacks.length, 'multi-item packs to discover/refine prices');
-      
-      const maxIterations = 15; // Increased iterations for better convergence
-      let iteration = 0;
-
-      while (iteration < maxIterations) {
-        let pricesChanged = false;
-        let newPricesFound = 0;
-        const newItemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = { ...itemStats };
-
-        multiItemPacks.forEach(pack => {
-          if (!pack.items || pack.items.length <= 1) return;
-
-          // Separate known and unknown items
-          let knownValue = 0;
-          let knownItems: Array<{ itemTypeId: string; quantity: number; price: number }> = [];
-          let unknownItems: Array<{ itemTypeId: string; quantity: number }> = [];
-
-          pack.items.forEach(item => {
-            if (currentPrices[item.itemTypeId] !== undefined) {
-              const itemValue = currentPrices[item.itemTypeId] * item.quantity;
-              knownValue += itemValue;
-              knownItems.push({
-                itemTypeId: item.itemTypeId,
-                quantity: item.quantity,
-                price: currentPrices[item.itemTypeId]
-              });
-            } else {
-              unknownItems.push(item);
-            }
-          });
-
-          // If we have some known items and some unknown items, we can infer unknown prices
-          if (unknownItems.length > 0 && knownItems.length > 0 && knownValue < pack.price) {
-            const remainingValue = pack.price - knownValue;
-            
-            if (remainingValue > 0) {
-              // Distribute remaining value proportionally by quantity
-              const totalUnknownQuantity = unknownItems.reduce((sum, item) => sum + item.quantity, 0);
-              
-              unknownItems.forEach(item => {
-                const proportionalValue = (remainingValue * item.quantity) / totalUnknownQuantity;
-                
-                if (!newItemStats[item.itemTypeId]) {
-                  newItemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
-                  newPricesFound++;
-                }
-                
-                newItemStats[item.itemTypeId].totalCost += proportionalValue;
-                newItemStats[item.itemTypeId].totalQuantity += item.quantity;
-                newItemStats[item.itemTypeId].packCount += 1;
-              });
-            }
-          }
-          
-          // Also use this pack to refine existing price estimates
-          if (unknownItems.length === 0 && knownItems.length > 1) {
-            // This pack contains only known items - use it to validate/refine prices
-            const calculatedValue = knownItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const actualValue = pack.price;
-            
-            if (Math.abs(calculatedValue - actualValue) > 0.01) {
-              // There's a discrepancy - adjust prices proportionally
-              const adjustmentFactor = actualValue / calculatedValue;
-              
-              knownItems.forEach(item => {
-                const adjustedValue = (item.price * item.quantity * adjustmentFactor);
-                
-                if (!newItemStats[item.itemTypeId]) {
-                  newItemStats[item.itemTypeId] = { ...itemStats[item.itemTypeId] };
-                }
-                
-                newItemStats[item.itemTypeId].totalCost += adjustedValue;
-                newItemStats[item.itemTypeId].totalQuantity += item.quantity;
-                newItemStats[item.itemTypeId].packCount += 1;
-              });
-            }
-          }
-        });
-
-        // Update prices and check for changes
-        const previousPrices = { ...currentPrices };
-        Object.entries(newItemStats).forEach(([itemTypeId, stats]) => {
-          if (stats.totalQuantity > 0) {
-            const newPrice = stats.totalCost / stats.totalQuantity;
-            currentPrices[itemTypeId] = newPrice;
-            
-            // Log new discoveries
-            if (previousPrices[itemTypeId] === undefined) {
-              console.log(`🆕 Discovered: ${getItemTypeById(itemTypeId)?.name || itemTypeId} = $${newPrice.toFixed(4)}`);
-            }
-          }
-        });
-
-        // Check if prices have stabilized
-        const tolerance = 0.001;
-        pricesChanged = Object.keys(currentPrices).some(itemTypeId => {
-          const oldPrice = previousPrices[itemTypeId] || 0;
-          const newPrice = currentPrices[itemTypeId] || 0;
-          return Math.abs(newPrice - oldPrice) > tolerance;
-        });
-
-        console.log(`Iteration ${iteration + 1}: Found ${newPricesFound} new items, prices changed: ${pricesChanged}`);
-        
-        if (!pricesChanged && newPricesFound === 0) break;
-        iteration++;
-        itemStats = newItemStats;
-      }
-
-      console.log(`Algorithm completed after ${iteration} iterations`);
-      console.log(`Final pricing model covers ${Object.keys(currentPrices).length} different item types`);
+      // Use the shared pricing service
+      const { itemPrices, itemStats, totalPacks } = await calculateItemPrices(isRefresh);
+      setTotalPacks(totalPacks);
 
       // Convert to ItemValue array
       const values: ItemValue[] = Object.entries(itemStats).map(([itemTypeId, stats]) => {
@@ -225,6 +61,25 @@ export default function ItemValues() {
 
       setItemValues(values);
       setLastUpdated(new Date());
+      
+      // Save historical price snapshot
+      try {
+        const priceData: Record<string, { price: number; packCount: number; totalQuantity: number; itemName: string }> = {};
+        Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
+          const itemType = getItemTypeById(itemTypeId);
+          priceData[itemTypeId] = {
+            price: stats.totalCost / stats.totalQuantity,
+            packCount: stats.packCount,
+            totalQuantity: stats.totalQuantity,
+            itemName: itemType?.name || 'Unknown Item'
+          };
+        });
+        
+        await savePriceSnapshot(priceData);
+        console.log('📈 Historical price snapshot saved');
+      } catch (error) {
+        console.error('Failed to save price snapshot:', error);
+      }
     } catch (error) {
       console.error('Error loading item values:', error);
     } finally {
@@ -234,6 +89,7 @@ export default function ItemValues() {
   };
 
   const handleRefresh = () => {
+    clearPricingCache(); // Clear cache to force fresh calculation
     loadItemValues(true);
   };
 

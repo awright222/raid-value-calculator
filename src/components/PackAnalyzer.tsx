@@ -4,6 +4,9 @@ import GradeDisplay from './GradeDisplay';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { analyzePackValue, getAllPacks } from '../firebase/database';
+import { savePackAnalysis } from '../firebase/historical';
+import { calculateItemPrices } from '../services/pricingService';
+import { Timestamp } from 'firebase/firestore';
 
 interface AnalysisResult {
   total_energy: number;
@@ -41,114 +44,11 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         setRefreshing(true);
       }
       
-      const packs = await getAllPacks();
-      console.log('PackAnalyzer: Loading data from', packs.length, 'packs');
+      // Use the shared pricing service that has the advanced algorithm
+      const { itemPrices, itemStats } = await calculateItemPrices(isRefresh);
+      console.log('PackAnalyzer: Loaded prices for', Object.keys(itemPrices).length, 'item types');
       
-      // Debug: Check how many packs have items data
-      const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0);
-      const packsWithoutItems = packs.filter(pack => !pack.items || pack.items.length === 0);
-      console.log('Packs with items:', packsWithItems.length);
-      console.log('Packs without items:', packsWithoutItems.length);
-      
-      if (packsWithItems.length > 0) {
-        console.log('Sample pack with items:', packsWithItems[0]);
-      }
-      if (packsWithoutItems.length > 0) {
-        console.log('Sample pack without items:', packsWithoutItems[0]);
-      }
-      
-      let itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = {};
-      let currentPrices: Record<string, number> = {};
-      
-      // Step 1: Get prices from single-item packs (these are definitive)
-      packs.forEach(pack => {
-        if (!pack.items || pack.items.length !== 1) return;
-        
-        const item = pack.items[0];
-        if (!itemStats[item.itemTypeId]) {
-          itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
-        }
-        
-        itemStats[item.itemTypeId].totalCost += pack.price;
-        itemStats[item.itemTypeId].totalQuantity += item.quantity;
-        itemStats[item.itemTypeId].packCount += 1;
-      });
-
-      // Calculate initial prices from single-item packs
-      Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
-        currentPrices[itemTypeId] = stats.totalCost / stats.totalQuantity;
-      });
-
-      // Step 2: Iteratively infer prices from multi-item packs using weighted distribution
-      const multiItemPacks = packs.filter(pack => pack.items && pack.items.length > 1);
-      const maxIterations = 10;
-      let iteration = 0;
-
-      while (iteration < maxIterations) {
-        let pricesChanged = false;
-        const newItemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = JSON.parse(JSON.stringify(itemStats));
-
-        multiItemPacks.forEach(pack => {
-          if (!pack.items || pack.items.length <= 1) return;
-
-          // Calculate known value from items we already have prices for
-          let knownValue = 0;
-          let unknownItems: Array<{ itemTypeId: string; quantity: number }> = [];
-
-          pack.items.forEach(item => {
-            if (currentPrices[item.itemTypeId]) {
-              knownValue += currentPrices[item.itemTypeId] * item.quantity;
-            } else {
-              unknownItems.push(item);
-            }
-          });
-
-          // If we have some known items and some unknown items, we can infer unknown prices
-          if (unknownItems.length > 0 && knownValue < pack.price) {
-            const remainingValue = pack.price - knownValue;
-
-            // For now, distribute remaining value equally among unknown items by quantity
-            // This could be improved with more sophisticated weighting
-            const totalUnknownQuantity = unknownItems.reduce((sum, item) => sum + item.quantity, 0);
-            
-            if (totalUnknownQuantity > 0) {
-              unknownItems.forEach(item => {
-                const inferredPricePerItem = (remainingValue * item.quantity) / totalUnknownQuantity / item.quantity;
-                
-                if (!newItemStats[item.itemTypeId]) {
-                  newItemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
-                }
-                
-                newItemStats[item.itemTypeId].totalCost += inferredPricePerItem * item.quantity;
-                newItemStats[item.itemTypeId].totalQuantity += item.quantity;
-                newItemStats[item.itemTypeId].packCount += 1;
-              });
-            }
-          }
-        });
-
-        // Update prices and check for changes
-        const previousPrices = { ...currentPrices };
-        Object.entries(newItemStats).forEach(([itemTypeId, stats]) => {
-          if (stats.totalQuantity > 0) {
-            currentPrices[itemTypeId] = stats.totalCost / stats.totalQuantity;
-          }
-        });
-
-        // Check if prices have stabilized
-        const tolerance = 0.001;
-        pricesChanged = Object.keys(currentPrices).some(itemTypeId => {
-          const oldPrice = previousPrices[itemTypeId] || 0;
-          const newPrice = currentPrices[itemTypeId] || 0;
-          return Math.abs(newPrice - oldPrice) > tolerance;
-        });
-
-        if (!pricesChanged) break;
-        iteration++;
-        itemStats = newItemStats;
-      }
-      
-      setItemPrices(currentPrices);
+      setItemPrices(itemPrices);
       
       // Create a simplified stats object for confidence indicators
       const statsForConfidence: Record<string, { totalQuantity: number; packCount: number }> = {};
@@ -211,6 +111,9 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       const itemType = getItemTypeById(item.itemTypeId);
       const pricePerItem = itemPrices[item.itemTypeId] || 0;
       const itemMarketValue = item.quantity * pricePerItem;
+      
+      // Debug logging for value calculations
+      console.log(`📊 Item Breakdown: ${item.quantity}x ${itemType?.name || item.itemTypeId} = $${itemMarketValue.toFixed(2)} (unit price: $${pricePerItem.toFixed(6)})`);
       
       totalMarketValue += itemMarketValue;
       
@@ -278,13 +181,45 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         // Use Firebase for analysis
         const analysis = await analyzePackValue(totalEnergy, costPerEnergy);
         
-        setResult({
+        const resultData = {
           total_energy: totalEnergy,
           cost_per_energy: costPerEnergy,
           grade: analysis.grade,
           similar_packs: analysis.similar_packs,
           comparison: analysis.comparison
-        });
+        };
+        
+        setResult(resultData);
+        
+        // Save pack analysis to historical data
+        try {
+          await savePackAnalysis({
+            packName: packItems.map(item => {
+              const itemType = getItemTypeById(item.itemTypeId);
+              return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
+            }).join(', '),
+            packPrice: parseFloat(price),
+            totalEnergy: totalEnergy,
+            costPerEnergy: costPerEnergy,
+            grade: resultData.grade,
+            betterThanPercent: resultData.comparison.better_than_percent,
+            totalPacksCompared: resultData.comparison.total_packs_compared,
+            itemBreakdown: packItems.map(item => {
+              const itemType = getItemTypeById(item.itemTypeId);
+              const itemPrice = itemPrices[item.itemTypeId] || 0;
+              return {
+                itemTypeId: item.itemTypeId,
+                itemName: itemType?.name || 'Unknown Item',
+                quantity: item.quantity,
+                estimatedValue: itemPrice * item.quantity
+              };
+            }),
+            analysisDate: Timestamp.now()
+          });
+          console.log('📊 Pack analysis saved to history');
+        } catch (error) {
+          console.error('Failed to save pack analysis:', error);
+        }
       } else {
         // For non-energy packs, create a basic result
         setResult({
