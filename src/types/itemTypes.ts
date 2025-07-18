@@ -73,6 +73,12 @@ export const ITEM_TYPES: ItemType[] = [
     category: ITEM_CATEGORIES.LEVELING,
     description: 'Large experience boost for champions'
   },
+  {
+    id: 'xp_boost_1d',
+    name: '100% XP Boost (1d.)',
+    category: ITEM_CATEGORIES.LEVELING,
+    description: '100% XP boost for 1 day'
+  },
 
   // Ranking Up
   {
@@ -184,6 +190,30 @@ export const ITEM_TYPES: ItemType[] = [
     name: 'Multi-Battle Attempts',
     category: ITEM_CATEGORIES.FARMING,
     description: 'Attempts for automated multi-battle farming'
+  },
+  {
+    id: 'demon_lord_key',
+    name: 'Demon Lord Key',
+    category: ITEM_CATEGORIES.FARMING,
+    description: 'Key for accessing Demon Lord battles'
+  },
+  {
+    id: 'classic_arena_refill',
+    name: 'Classic Arena Refill',
+    category: ITEM_CATEGORIES.FARMING,
+    description: 'Refill for Classic Arena battles'
+  },
+  {
+    id: 'live_arena_refill',
+    name: 'Live Arena Refill',
+    category: ITEM_CATEGORIES.FARMING,
+    description: 'Refill for Live Arena battles'
+  },
+  {
+    id: 'tag_team_arena_refill',
+    name: 'Tag Team Arena Refill',
+    category: ITEM_CATEGORIES.FARMING,
+    description: 'Refill for Tag Team Arena battles'
   }
 ];
 
