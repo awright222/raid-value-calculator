@@ -104,7 +104,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
 
     setLoading(true);
     setError('');
-    setValidationWarnings([]);
+    setSuccess('');
     setValidationWarnings([]);
 
     try {
@@ -124,6 +124,13 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const totalEnergy = energyPots * 130 + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(formData.price) / totalEnergy : 0;
       
+      console.log('🚀 Starting pack submission:', {
+        name: formData.name,
+        price: parseFloat(formData.price),
+        validItems: validItems.length,
+        totalEnergy
+      });
+      
       // Use enhanced validation
       const result = await addPackWithValidation({
         name: formData.name,
@@ -138,6 +145,8 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
         })),
       });
 
+      console.log('✅ Pack submission successful:', result);
+
       // Show validation results
       if (result.warnings.length > 0) {
         setValidationWarnings(result.warnings);
@@ -148,14 +157,18 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
         console.log('💡 Pack validation suggestions:', result.suggestions);
       }
 
-      setSuccess('Pack added successfully!' + 
+      setSuccess(`Pack "${formData.name}" added successfully!` + 
         (result.warnings.length > 0 ? ' (See warnings below)' : ''));
+      
+      // Reset form on success
       setFormData({ name: '', price: '' });
       setPackItems([]);
       onPackAdded();
-    } catch (error) {
-      console.error('Error adding pack:', error);
-      setError('Failed to add pack. Please try again.');
+      
+    } catch (error: any) {
+      console.error('❌ Error adding pack:', error);
+      const errorMessage = error?.message || 'Failed to add pack. Please try again.';
+      setError(`Failed to add pack: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

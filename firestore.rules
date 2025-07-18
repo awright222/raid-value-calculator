@@ -14,10 +14,11 @@ service cloud.firestore {
     
     // Validate pack data to prevent abuse
     function isValidPackData() {
-      return request.resource.data.keys().hasAll(['packName', 'packPrice']) &&
-             request.resource.data.packPrice is number &&
-             request.resource.data.packPrice >= 0.01 &&
-             request.resource.data.packPrice <= 1000.00; // Reasonable price range
+      return (request.resource.data.keys().hasAll(['name', 'price']) ||
+              request.resource.data.keys().hasAll(['packName', 'packPrice'])) &&
+             (request.resource.data.price is number || request.resource.data.packPrice is number) &&
+             ((request.resource.data.price >= 0.01 && request.resource.data.price <= 1000.00) ||
+              (request.resource.data.packPrice >= 0.01 && request.resource.data.packPrice <= 1000.00)); // Reasonable price range
     }
     
     // Public read access to packs (anyone can view pack data)
@@ -31,9 +32,12 @@ service cloud.firestore {
     match /pack_analysis_history/{analysisId} {
       allow read: if true;
       allow write: if isWithinRateLimit() && 
-                     request.resource.data.keys().hasAll(['packName']) &&
-                     request.resource.data.packName is string &&
-                     request.resource.data.packName.size() <= 200; // Max 200 chars
+                     (request.resource.data.keys().hasAll(['packName']) ||
+                      request.resource.data.keys().hasAll(['name'])) &&
+                     (request.resource.data.packName is string ||
+                      request.resource.data.name is string) &&
+                     ((request.resource.data.packName.size() <= 200) ||
+                      (request.resource.data.name.size() <= 200)); // Max 200 chars
     }
     
     // Price snapshots - controlled writes
