@@ -1,90 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is admin
-    function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
-    }
-    
-    // Rate limiting helper - prevent spam
-    function isWithinRateLimit() {
-      // Only allow writes if they're reasonable size
-      return request.writeFields.size() <= 50; // Max 50 fields per write
-    }
-    
-    // Validate pack data to prevent abuse - Updated validation logic
-    function isValidPackData() {
-      // Check for required basic fields
-      return request.resource.data.keys().hasAll(['name', 'price']) &&
-             request.resource.data.name is string &&
-             request.resource.data.price is number &&
-             request.resource.data.price >= 0.01 && 
-             request.resource.data.price <= 1000.00 &&
-             request.resource.data.name.size() <= 200; // Max 200 chars for pack name
-    }
-    
-    // Public read access to packs (anyone can view pack data)
-    match /packs/{packId} {
-      allow read: if true;
-      // Temporarily allow all writes until validation is working
-      allow write: if true;
-    }
-    
-    // Restrict historical data writes
-    match /pack_analysis_history/{analysisId} {
-      allow read: if true;
-      allow write: if isWithinRateLimit() && 
-                     (request.resource.data.keys().hasAll(['packName']) ||
-                      request.resource.data.keys().hasAll(['name'])) &&
-                     (request.resource.data.packName is string ||
-                      request.resource.data.name is string) &&
-                     ((request.resource.data.packName.size() <= 200) ||
-                      (request.resource.data.name.size() <= 200)); // Max 200 chars
-    }
-    
-    // Price snapshots - controlled writes
-    match /price_snapshots/{snapshotId} {
-      allow read: if true;
-      allow write: if isWithinRateLimit();
-    }
-    
-    // Market trends - controlled writes  
-    match /market_trends/{trendId} {
-      allow read: if true;
-      allow write: if isWithinRateLimit();
-    }
-    
-    // Pack intelligence - controlled
-    match /pack_data_history/{historyId} {
-      allow read: if true;
-      allow write: if isWithinRateLimit();
-    }
-    
-    match /pack_market_intelligence/{intelligenceId} {
-      allow read: if true;
-      allow write: if isWithinRateLimit();
-    }
-    
-    // Pending packs - more restrictive
-    match /pending_packs/{packId} {
-      allow read: if false; // Only admin should see pending
-      allow write: if isValidPackData() && isWithinRateLimit();
-    }
-    
-    // Analytics events - write-only for privacy with strict limits
-    match /analytics_events/{eventId} {
-      allow read: if false; // Privacy: users can't read analytics
-      allow write: if isWithinRateLimit() &&
-                     request.resource.data.keys().hasAll(['eventType']) &&
-                     request.resource.data.eventType is string &&
-                     request.resource.data.eventType in ['pack_view', 'user_engagement', 'conversion'] &&
-                     // Limit event data size
-                     request.resource.data.size() <= 20; // Max 20 fields per analytics event
-    }
-    
-    // Default: deny all other access
+    // Allow all reads and writes for debugging
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
