@@ -24,43 +24,93 @@ export default function ItemValues() {
   const loadItemValues = async () => {
     try {
       const packs = await getAllPacks();
-      const itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = {};
+      let itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = {};
+      let currentPrices: Record<string, number> = {};
 
-      // Calculate statistics for each item type
+      // Step 1: Get prices from single-item packs (these are definitive)
       packs.forEach(pack => {
-        if (!pack.items || pack.items.length === 0) return;
+        if (!pack.items || pack.items.length !== 1) return;
         
-        const packPrice = pack.price;
-        
-        // If pack has only one item type, use full pack price
-        if (pack.items.length === 1) {
-          const item = pack.items[0];
-          if (!itemStats[item.itemTypeId]) {
-            itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
-          }
-          
-          itemStats[item.itemTypeId].totalCost += packPrice;
-          itemStats[item.itemTypeId].totalQuantity += item.quantity;
-          itemStats[item.itemTypeId].packCount += 1;
-        } else {
-          // For multi-item packs, use proportional allocation
-          const totalItems = pack.items.reduce((sum, item) => sum + item.quantity, 0);
-          
-          pack.items.forEach(item => {
-            if (!itemStats[item.itemTypeId]) {
-              itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
-            }
-            
-            // Proportional cost allocation based on quantity
-            const itemProportion = item.quantity / totalItems;
-            const itemCost = packPrice * itemProportion;
-            
-            itemStats[item.itemTypeId].totalCost += itemCost;
-            itemStats[item.itemTypeId].totalQuantity += item.quantity;
-            itemStats[item.itemTypeId].packCount += 1;
-          });
+        const item = pack.items[0];
+        if (!itemStats[item.itemTypeId]) {
+          itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
         }
+        
+        itemStats[item.itemTypeId].totalCost += pack.price;
+        itemStats[item.itemTypeId].totalQuantity += item.quantity;
+        itemStats[item.itemTypeId].packCount += 1;
       });
+
+      // Calculate initial prices from single-item packs
+      Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
+        currentPrices[itemTypeId] = stats.totalCost / stats.totalQuantity;
+      });
+
+      // Step 2: Iteratively infer prices from multi-item packs using weighted distribution
+      const multiItemPacks = packs.filter(pack => pack.items && pack.items.length > 1);
+      const maxIterations = 10;
+      let iteration = 0;
+
+      while (iteration < maxIterations) {
+        let pricesChanged = false;
+        const newItemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = { ...itemStats };
+
+        multiItemPacks.forEach(pack => {
+          if (!pack.items || pack.items.length <= 1) return;
+
+          // Calculate known value from items we already have prices for
+          let knownValue = 0;
+          let unknownItems: Array<{ itemTypeId: string; quantity: number }> = [];
+
+          pack.items.forEach(item => {
+            if (currentPrices[item.itemTypeId]) {
+              knownValue += currentPrices[item.itemTypeId] * item.quantity;
+            } else {
+              unknownItems.push(item);
+            }
+          });
+
+          // If we have some known items and some unknown items, we can infer unknown prices
+          if (unknownItems.length > 0 && knownValue < pack.price) {
+            const remainingValue = pack.price - knownValue;
+            const totalUnknownQuantity = unknownItems.reduce((sum, item) => sum + item.quantity, 0);
+            
+            if (totalUnknownQuantity > 0) {
+              unknownItems.forEach(item => {
+                const inferredPricePerItem = (remainingValue * item.quantity) / totalUnknownQuantity / item.quantity;
+                
+                if (!newItemStats[item.itemTypeId]) {
+                  newItemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0, packCount: 0 };
+                }
+                
+                newItemStats[item.itemTypeId].totalCost += inferredPricePerItem * item.quantity;
+                newItemStats[item.itemTypeId].totalQuantity += item.quantity;
+                newItemStats[item.itemTypeId].packCount += 1;
+              });
+            }
+          }
+        });
+
+        // Update prices and check for changes
+        const previousPrices = { ...currentPrices };
+        Object.entries(newItemStats).forEach(([itemTypeId, stats]) => {
+          if (stats.totalQuantity > 0) {
+            currentPrices[itemTypeId] = stats.totalCost / stats.totalQuantity;
+          }
+        });
+
+        // Check if prices have stabilized
+        const tolerance = 0.001;
+        pricesChanged = Object.keys(currentPrices).some(itemTypeId => {
+          const oldPrice = previousPrices[itemTypeId] || 0;
+          const newPrice = currentPrices[itemTypeId] || 0;
+          return Math.abs(newPrice - oldPrice) > tolerance;
+        });
+
+        if (!pricesChanged) break;
+        iteration++;
+        itemStats = newItemStats;
+      }
 
       // Convert to ItemValue array
       const values: ItemValue[] = Object.entries(itemStats).map(([itemTypeId, stats]) => {
