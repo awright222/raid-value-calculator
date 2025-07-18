@@ -124,6 +124,27 @@ function App() {
         </AnimatePresence>
       </main>
 
+      {/* Disclaimer Footer */}
+      <footer className="mt-12 py-6 px-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+            <p className="mb-2 font-medium">⚠️ Important Disclaimer</p>
+            <p className="mb-2">
+              This tool is <strong>not affiliated with Plarium Games or Raid: Shadow Legends</strong> in any way. 
+              It is an independent community tool designed solely to help players evaluate pack values.
+            </p>
+            <p className="mb-2">
+              <strong>This tool is NOT intended to encourage spending.</strong> All pricing data is estimated and may contain errors. 
+              Pack values are calculated based on community-submitted data and algorithmic analysis, which may not reflect true market value.
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">
+              Use at your own risk. Always make informed decisions about in-game purchases. 
+              Raid: Shadow Legends is a trademark of Plarium Games Ltd.
+            </p>
+          </div>
+        </div>
+      </footer>
+
       {/* Login Modal */}
       <LoginModal
         isOpen={showLoginModal}

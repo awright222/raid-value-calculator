@@ -141,6 +141,12 @@ export default function ItemValues() {
                 </span>
               )}
             </p>
+            {totalPacks < 50 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                ⚠️ Limited data available ({totalPacks} packs) - prices may be unstable. 
+                Community submissions needed for accuracy.
+              </p>
+            )}
           </div>
           
           <div className="flex items-center space-x-4">

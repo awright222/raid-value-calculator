@@ -15,6 +15,22 @@ export interface PricingResult {
   totalPacks: number;
 }
 
+export interface PackValueAnalysis {
+  grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F' | 'NEW';
+  totalValue: number;
+  dollarsPerDollar: number; // How much value you get per dollar spent
+  comparison: {
+    betterThanPercent: number;
+    totalPacksCompared: number;
+  };
+  similarPacks: Array<{
+    name: string;
+    price: number;
+    totalValue: number;
+    dollarsPerDollar: number;
+  }>;
+}
+
 /**
  * Advanced dynamic pricing algorithm that discovers item prices through iterative deduction
  * This is the same algorithm used in ItemValues but extracted for reuse
@@ -282,4 +298,144 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
   }
 
   return result;
+};
+
+/**
+ * Analyze pack value using dynamic pricing instead of energy-based comparison
+ */
+export const analyzePackValueNew = async (
+  packItems: Array<{ itemTypeId: string; quantity: number }>,
+  packPrice: number
+): Promise<PackValueAnalysis> => {
+  try {
+    // Get current pricing data
+    const { itemPrices } = await calculateItemPrices();
+    
+    // Calculate total value of items in the pack
+    let totalValue = 0;
+    const itemBreakdown: Array<{ itemTypeId: string; quantity: number; unitPrice: number; totalPrice: number }> = [];
+    
+    packItems.forEach(item => {
+      const unitPrice = itemPrices[item.itemTypeId] || 0;
+      const totalPrice = unitPrice * item.quantity;
+      totalValue += totalPrice;
+      
+      itemBreakdown.push({
+        itemTypeId: item.itemTypeId,
+        quantity: item.quantity,
+        unitPrice,
+        totalPrice
+      });
+    });
+    
+    const dollarsPerDollar = totalValue / packPrice; // Value received per dollar spent
+    
+    console.log('🎯 Pack Value Analysis:');
+    console.log(`Pack Price: $${packPrice}`);
+    console.log(`Total Item Value: $${totalValue.toFixed(2)}`);
+    console.log(`Value per Dollar: $${dollarsPerDollar.toFixed(2)}`);
+    
+    // Get all existing packs for comparison
+    const allPacks = await getAllPacks();
+    const packsWithItems = allPacks.filter(pack => pack.items && pack.items.length > 0);
+    
+    if (packsWithItems.length === 0) {
+      return {
+        grade: 'NEW',
+        totalValue,
+        dollarsPerDollar,
+        comparison: {
+          betterThanPercent: 0,
+          totalPacksCompared: 0
+        },
+        similarPacks: []
+      };
+    }
+    
+    // Calculate value ratios for all existing packs
+    const packValueRatios: Array<{ pack: any; valueRatio: number }> = [];
+    
+    for (const pack of packsWithItems) {
+      if (!pack.items || pack.items.length === 0) continue;
+      
+      let packTotalValue = 0;
+      
+      pack.items.forEach((item: any) => {
+        const unitPrice = itemPrices[item.itemTypeId] || 0;
+        packTotalValue += unitPrice * item.quantity;
+      });
+      
+      const packValueRatio = packTotalValue / pack.price;
+      packValueRatios.push({ pack, valueRatio: packValueRatio });
+    }
+    
+    // Sort by value ratio (best deals first)
+    packValueRatios.sort((a, b) => b.valueRatio - a.valueRatio);
+    
+    // Find where this pack ranks
+    const betterPacks = packValueRatios.filter(p => p.valueRatio > dollarsPerDollar);
+    const betterThanPercent = Math.round(((packValueRatios.length - betterPacks.length) / packValueRatios.length) * 100);
+    
+    // Determine grade based on percentile
+    let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+    if (betterThanPercent >= 90) grade = 'S';
+    else if (betterThanPercent >= 80) grade = 'A';
+    else if (betterThanPercent >= 70) grade = 'B';
+    else if (betterThanPercent >= 60) grade = 'C';
+    else if (betterThanPercent >= 50) grade = 'D';
+    else grade = 'F';
+    
+    // Find similar packs (within 20% of total value)
+    const valueRange = {
+      min: totalValue * 0.8,
+      max: totalValue * 1.2
+    };
+    
+    const similarPacks = packValueRatios
+      .filter(p => {
+        if (!p.pack.items || p.pack.items.length === 0) return false;
+        
+        const packTotalValue = p.pack.items.reduce((sum: number, item: any) => {
+          const unitPrice = itemPrices[item.itemTypeId] || 0;
+          return sum + (unitPrice * item.quantity);
+        }, 0);
+        return packTotalValue >= valueRange.min && packTotalValue <= valueRange.max;
+      })
+      .slice(0, 5) // Top 5 similar packs
+      .map(p => {
+        const packTotalValue = p.pack.items!.reduce((sum: number, item: any) => {
+          const unitPrice = itemPrices[item.itemTypeId] || 0;
+          return sum + (unitPrice * item.quantity);
+        }, 0);
+        
+        return {
+          name: p.pack.items!.map((item: any) => {
+            const itemType = getItemTypeById(item.itemTypeId);
+            return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
+          }).join(', '),
+          price: p.pack.price,
+          totalValue: packTotalValue,
+          dollarsPerDollar: p.valueRatio
+        };
+      });
+    
+    console.log(`📊 Grade: ${grade} (${betterThanPercent}% percentile)`);
+    console.log(`📦 Compared against ${packValueRatios.length} packs`);
+    console.log(`🎯 Found ${similarPacks.length} similar packs`);
+    
+    return {
+      grade,
+      totalValue,
+      dollarsPerDollar,
+      comparison: {
+        betterThanPercent,
+        totalPacksCompared: packValueRatios.length
+      },
+      similarPacks
+    };
+    
+  } catch (error) {
+    console.error('Error analyzing pack value:', error);
+    throw error;
+  }
 };

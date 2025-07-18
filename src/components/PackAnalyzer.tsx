@@ -3,9 +3,8 @@ import { motion } from 'framer-motion';
 import GradeDisplay from './GradeDisplay';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
-import { analyzePackValue } from '../firebase/database';
 import { savePackAnalysis } from '../firebase/historical';
-import { calculateItemPrices } from '../services/pricingService';
+import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
 import { Timestamp } from 'firebase/firestore';
 
 interface AnalysisResult {
@@ -17,6 +16,9 @@ interface AnalysisResult {
     better_than_percent: number;
     total_packs_compared: number;
   };
+  // New fields for dynamic pricing
+  totalValue?: number;
+  dollarsPerDollar?: number;
 }
 
 interface PackAnalyzerProps {
@@ -165,7 +167,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
     setError('');
 
     try {
-      // Calculate total energy from energy items
+      // Calculate total energy from energy items (for legacy display)
       const energyPots = packItems
         .filter(item => item.itemTypeId === 'energy_pot')
         .reduce((sum, item) => sum + item.quantity, 0);
@@ -177,61 +179,60 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       const totalEnergy = (energyPots * 130) + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(price) / totalEnergy : 0;
 
-      if (totalEnergy > 0) {
-        // Use Firebase for analysis
-        const analysis = await analyzePackValue(totalEnergy, costPerEnergy);
+      // Use new dynamic pricing analysis
+      const packItemsForAnalysis = packItems.map(item => ({
+        itemTypeId: item.itemTypeId,
+        quantity: item.quantity
+      }));
+      
+      const analysis = await analyzePackValueNew(packItemsForAnalysis, parseFloat(price));
+      
+      // Get item prices for historical data
+      const { itemPrices } = await calculateItemPrices();
+      
+      const resultData = {
+        total_energy: totalEnergy,
+        cost_per_energy: costPerEnergy,
+        grade: analysis.grade,
+        similar_packs: analysis.similarPacks,
+        comparison: {
+          better_than_percent: analysis.comparison.betterThanPercent,
+          total_packs_compared: analysis.comparison.totalPacksCompared
+        },
+        totalValue: analysis.totalValue,
+        dollarsPerDollar: analysis.dollarsPerDollar
+      };
+      
+      setResult(resultData);
         
-        const resultData = {
-          total_energy: totalEnergy,
-          cost_per_energy: costPerEnergy,
-          grade: analysis.grade,
-          similar_packs: analysis.similar_packs,
-          comparison: analysis.comparison
-        };
-        
-        setResult(resultData);
-        
-        // Save pack analysis to historical data
-        try {
-          await savePackAnalysis({
-            packName: packItems.map(item => {
-              const itemType = getItemTypeById(item.itemTypeId);
-              return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
-            }).join(', '),
-            packPrice: parseFloat(price),
-            totalEnergy: totalEnergy,
-            costPerEnergy: costPerEnergy,
-            grade: resultData.grade,
-            betterThanPercent: resultData.comparison.better_than_percent,
-            totalPacksCompared: resultData.comparison.total_packs_compared,
-            itemBreakdown: packItems.map(item => {
-              const itemType = getItemTypeById(item.itemTypeId);
-              const itemPrice = itemPrices[item.itemTypeId] || 0;
-              return {
-                itemTypeId: item.itemTypeId,
-                itemName: itemType?.name || 'Unknown Item',
-                quantity: item.quantity,
-                estimatedValue: itemPrice * item.quantity
-              };
-            }),
-            analysisDate: Timestamp.now()
-          });
-          console.log('📊 Pack analysis saved to history');
-        } catch (error) {
-          console.error('Failed to save pack analysis:', error);
-        }
-      } else {
-        // For non-energy packs, create a basic result
-        setResult({
-          total_energy: 0,
-          cost_per_energy: 0,
-          grade: 'NEW',
-          similar_packs: [],
-          comparison: {
-            better_than_percent: 0,
-            total_packs_compared: 0
-          }
+      // Save pack analysis to historical data
+      try {
+        await savePackAnalysis({
+          packName: packItems.map(item => {
+            const itemType = getItemTypeById(item.itemTypeId);
+            return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
+          }).join(', '),
+          packPrice: parseFloat(price),
+          totalEnergy: totalEnergy,
+          costPerEnergy: costPerEnergy,
+          grade: resultData.grade,
+          betterThanPercent: resultData.comparison.better_than_percent,
+          totalPacksCompared: resultData.comparison.total_packs_compared,
+          itemBreakdown: packItems.map(item => {
+            const itemType = getItemTypeById(item.itemTypeId);
+            const itemPrice = itemPrices[item.itemTypeId] || 0;
+            return {
+              itemTypeId: item.itemTypeId,
+              itemName: itemType?.name || 'Unknown Item',
+              quantity: item.quantity,
+              estimatedValue: itemPrice * item.quantity
+            };
+          }),
+          analysisDate: Timestamp.now()
         });
+        console.log('📊 Pack analysis saved to history');
+      } catch (error) {
+        console.error('Failed to save pack analysis:', error);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -255,13 +256,18 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         className="card p-10 floating-card"
       >
         <div className="flex items-center justify-between mb-8">
-          <motion.h2 
-            className="text-3xl font-bold bg-gradient-to-r from-secondary-900 to-primary-700 bg-clip-text text-transparent"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            Analyze Pack Value
-          </motion.h2>
+          <div>
+            <motion.h2 
+              className="text-3xl font-bold bg-gradient-to-r from-secondary-900 to-primary-700 bg-clip-text text-transparent"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              Analyze Pack Value
+            </motion.h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              📊 Estimates based on community data - results may vary. Not financial advice.
+            </p>
+          </div>
           
           <button
             onClick={handleRefreshData}
