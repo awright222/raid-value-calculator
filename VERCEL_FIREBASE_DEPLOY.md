@@ -24,12 +24,29 @@ const firebaseConfig = {
 };
 ```
 
-## Step 3: Deploy to Vercel
-1. Push your code to GitHub
-2. Go to https://vercel.com
-3. Import your GitHub repository
-4. Vercel will auto-detect it's a Vite React app
-5. Deploy!
+## Step 3: Deploy to Vercel (Using Git Repository)
+1. **Push to GitHub:**
+   ```bash
+   # If you haven't created a GitHub repo yet:
+   # 1. Go to github.com and create a new repository
+   # 2. Copy the repository URL, then run:
+   
+   git remote add origin https://github.com/yourusername/raid-value-calc.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+2. **Deploy on Vercel:**
+   - Go to https://vercel.com
+   - Click "New Project"
+   - Import your GitHub repository
+   - Vercel will auto-detect it's a Vite React app
+   - Click "Deploy!"
+   - That's it! ✨
+
+3. **Auto-deployments:**
+   - Every time you push to GitHub, Vercel automatically redeploys
+   - Perfect for continuous deployment!
 
 ## Step 4: Environment Variables (Optional)
 If you want to hide your Firebase config:

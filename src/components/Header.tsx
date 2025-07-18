@@ -2,11 +2,10 @@ import { motion } from 'framer-motion';
 
 interface HeaderProps {
   isAdminAuthenticated: boolean;
-  adminModeAvailable: boolean;
   onLogout: () => void;
 }
 
-export default function Header({ isAdminAuthenticated, adminModeAvailable, onLogout }: HeaderProps) {
+export default function Header({ isAdminAuthenticated, onLogout }: HeaderProps) {
   const appTitle = isAdminAuthenticated ? 'Raid Value Calculator - Admin' : 'Raid Value Calculator';
 
   return (
