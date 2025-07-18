@@ -30,10 +30,21 @@ dist-ssr
 .env.test.local
 .env.production.local
 
+# Files with potentially sensitive data
+fix-existing-packs.js
+*.config.js.backup
+firebase-config.js
+
+# Firebase
+.firebase
+firebase-debug.log
+firestore-debug.log
+.env.production.local
+
 # Database files (we're using Firebase now)
 *.db
 *.sqlite
 *.sqlite3
 
 # Firebase cache
-.firebase/
+.firebase/fix-existing-packs.js
