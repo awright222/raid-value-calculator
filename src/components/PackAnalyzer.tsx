@@ -28,14 +28,35 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [error, setError] = useState('');
   const [itemPrices, setItemPrices] = useState<Record<string, number>>({});
   const [itemStats, setItemStats] = useState<Record<string, { totalQuantity: number; packCount: number }>>({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastDataUpdate, setLastDataUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     loadItemPrices();
   }, []);
 
-  const loadItemPrices = async () => {
+  const loadItemPrices = async (isRefresh = false) => {
     try {
+      if (isRefresh) {
+        setRefreshing(true);
+      }
+      
       const packs = await getAllPacks();
+      console.log('PackAnalyzer: Loading data from', packs.length, 'packs');
+      
+      // Debug: Check how many packs have items data
+      const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0);
+      const packsWithoutItems = packs.filter(pack => !pack.items || pack.items.length === 0);
+      console.log('Packs with items:', packsWithItems.length);
+      console.log('Packs without items:', packsWithoutItems.length);
+      
+      if (packsWithItems.length > 0) {
+        console.log('Sample pack with items:', packsWithItems[0]);
+      }
+      if (packsWithoutItems.length > 0) {
+        console.log('Sample pack without items:', packsWithoutItems[0]);
+      }
+      
       let itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }> = {};
       let currentPrices: Record<string, number> = {};
       
@@ -138,9 +159,16 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         };
       });
       setItemStats(statsForConfidence);
+      setLastDataUpdate(new Date());
     } catch (error) {
       console.error('Error loading item prices:', error);
+    } finally {
+      setRefreshing(false);
     }
+  };
+
+  const handleRefreshData = () => {
+    loadItemPrices(true);
   };
 
   const addItem = () => {
@@ -291,13 +319,27 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         animate={{ opacity: 1, scale: 1 }}
         className="card p-10 floating-card"
       >
-        <motion.h2 
-          className="text-3xl font-bold bg-gradient-to-r from-secondary-900 to-primary-700 bg-clip-text text-transparent mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          Analyze Pack Value
-        </motion.h2>
+        <div className="flex items-center justify-between mb-8">
+          <motion.h2 
+            className="text-3xl font-bold bg-gradient-to-r from-secondary-900 to-primary-700 bg-clip-text text-transparent"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Analyze Pack Value
+          </motion.h2>
+          
+          <button
+            onClick={handleRefreshData}
+            disabled={refreshing}
+            className="text-sm text-secondary-600 hover:text-primary-600 transition-colors flex items-center space-x-1"
+            title="Refresh market data"
+          >
+            <span className={`text-lg ${refreshing ? 'animate-spin' : ''}`}>🔄</span>
+            <span className="text-xs">
+              {refreshing ? 'Updating...' : `Data: ${lastDataUpdate.toLocaleTimeString()}`}
+            </span>
+          </button>
+        </div>
         
         <div className="grid lg:grid-cols-2 gap-12">
           {/* Input Form */}

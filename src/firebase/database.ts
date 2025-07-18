@@ -48,10 +48,17 @@ export const getAllPacks = async (): Promise<FirebasePack[]> => {
     );
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
+    const packs = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as FirebasePack[];
+    
+    console.log('getAllPacks: Retrieved', packs.length, 'packs from database');
+    if (packs.length > 0) {
+      console.log('Sample pack:', packs[0]);
+    }
+    
+    return packs;
   } catch (error) {
     console.error('Error getting packs:', error);
     throw error;
