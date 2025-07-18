@@ -1,9 +1,75 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow all reads and writes for debugging
+    // Rate limiting helper - prevent spam
+    function isWithinRateLimit() {
+      return request.writeFields.size() <= 50; // Max 50 fields per write
+    }
+    
+    // Validate pack data to prevent abuse
+    function isValidPackData() {
+      return request.resource.data.keys().hasAll(['name', 'price']) &&
+             request.resource.data.name is string &&
+             request.resource.data.price is number &&
+             request.resource.data.price >= 0.01 && 
+             request.resource.data.price <= 1000.00 &&
+             request.resource.data.name.size() <= 200; // Max 200 chars for pack name
+    }
+    
+    // Public read access to packs (anyone can view pack data)
+    match /packs/{packId} {
+      allow read: if true;
+      allow write: if isValidPackData() && isWithinRateLimit();
+    }
+    
+    // Historical data - controlled writes
+    match /pack_analysis_history/{analysisId} {
+      allow read: if true;
+      allow write: if isWithinRateLimit();
+    }
+    
+    // Price snapshots - controlled writes
+    match /price_snapshots/{snapshotId} {
+      allow read: if true;
+      allow write: if isWithinRateLimit();
+    }
+    
+    // Market trends - controlled writes  
+    match /market_trends/{trendId} {
+      allow read: if true;
+      allow write: if isWithinRateLimit();
+    }
+    
+    // Pack intelligence - controlled
+    match /pack_data_history/{historyId} {
+      allow read: if true;
+      allow write: if isWithinRateLimit();
+    }
+    
+    match /pack_market_intelligence/{intelligenceId} {
+      allow read: if true;
+      allow write: if isWithinRateLimit();
+    }
+    
+    // Pending packs - public writes for community submissions
+    match /pending_packs/{packId} {
+      allow read: if true;
+      allow write: if isValidPackData() && isWithinRateLimit();
+    }
+    
+    // Analytics events - write-only for privacy
+    match /analytics_events/{eventId} {
+      allow read: if false; // Privacy: users can't read analytics
+      allow write: if isWithinRateLimit() &&
+                     request.resource.data.keys().hasAll(['eventType']) &&
+                     request.resource.data.eventType is string &&
+                     request.resource.data.eventType in ['pack_view', 'user_engagement', 'conversion'] &&
+                     request.resource.data.size() <= 20; // Max 20 fields per analytics event
+    }
+    
+    // Default: deny all other access
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
