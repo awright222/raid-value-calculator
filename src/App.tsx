@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PackAnalyzer from './components/PackAnalyzer';
 import AdminPanel from './components/AdminPanel';
+import ItemValues from './components/ItemValues';
+import BestDeals from './components/BestDeals';
 import Header from './components/Header';
 import LoginModal from './components/LoginModal';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'analyze' | 'admin'>('analyze');
+  const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'deals' | 'admin'>('analyze');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -35,7 +37,7 @@ function App() {
     }
   };
 
-  const handleTabClick = (tabId: 'analyze' | 'admin') => {
+  const handleTabClick = (tabId: 'analyze' | 'values' | 'deals' | 'admin') => {
     if (tabId === 'admin' && !isAdminAuthenticated) {
       setShowLoginModal(true);
       setLoginError('');
@@ -53,6 +55,8 @@ function App() {
 
   const baseTabs = [
     { id: 'analyze', label: 'Analyze Pack', icon: '🔍' },
+    { id: 'values', label: 'Item Values', icon: '💰' },
+    { id: 'deals', label: 'Best Deals', icon: '🏆' },
   ] as const;
 
   const adminTab = { id: 'admin', label: isAdminAuthenticated ? 'Add Pack' : 'Admin Login', icon: isAdminAuthenticated ? '⚙️' : '🔐' } as const;
@@ -105,6 +109,8 @@ function App() {
             transition={{ duration: 0.3 }}
           >
             {activeTab === 'analyze' && <PackAnalyzer />}
+            {activeTab === 'values' && <ItemValues />}
+            {activeTab === 'deals' && <BestDeals />}
             {activeTab === 'admin' && isAdminAuthenticated && (
               <AdminPanel onPackAdded={() => {}} />
             )}
