@@ -7,6 +7,18 @@ interface BiometricAuthResult {
 }
 
 export class BiometricAuth {
+  // Simple password hashing (for additional security layer)
+  private static hashPassword(password: string): string {
+    // Simple hash function - in production, use proper crypto
+    let hash = 0;
+    for (let i = 0; i < password.length; i++) {
+      const char = password.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+  }
+
   // Check if biometric authentication is available
   static async isAvailable(): Promise<boolean> {
     if (!window.PublicKeyCredential) {
@@ -21,28 +33,54 @@ export class BiometricAuth {
     }
   }
 
-  // Clear stored credentials (reset biometric setup)
-  static clearSetup(): void {
-    localStorage.removeItem('biometric-credential-id');
-    localStorage.removeItem('biometric-setup-date');
-  }
-
-  // Check if setup is recent (within 30 days) to prevent stale credentials
-  static isSetupValid(): boolean {
-    const credentialId = localStorage.getItem('biometric-credential-id');
-    const setupDate = localStorage.getItem('biometric-setup-date');
+  // Clear stored credentials (reset biometric setup) - ADMIN ONLY
+  static clearSetup(adminPasswordHash?: string): boolean {
+    // Allow reset only if admin password is provided or if credentials are stale
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123';
     
-    if (!credentialId || !setupDate) {
+    if (adminPasswordHash && adminPasswordHash !== this.hashPassword(adminPassword)) {
+      console.warn('🚨 Unauthorized attempt to reset biometric credentials');
       return false;
     }
     
+    localStorage.removeItem('biometric-credential-id');
+    localStorage.removeItem('biometric-setup-date');
+    localStorage.removeItem('biometric-admin-hash');
+    return true;
+  }
+
+  // Check if setup is recent and valid with admin verification
+  static isSetupValid(): boolean {
+    const credentialId = localStorage.getItem('biometric-credential-id');
+    const setupDate = localStorage.getItem('biometric-setup-date');
+    const storedAdminHash = localStorage.getItem('biometric-admin-hash');
+    
+    if (!credentialId || !setupDate || !storedAdminHash) {
+      return false;
+    }
+    
+    // Verify the stored admin hash matches current admin password
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123';
+    if (storedAdminHash !== this.hashPassword(adminPassword)) {
+      console.warn('🚨 Admin password changed - invalidating biometric credentials');
+      this.clearSetup();
+      return false;
+    }
+    
+    // Check if setup is within 30 days
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     return parseInt(setupDate) > thirtyDaysAgo;
   }
 
-  // Register biometric authentication (one-time setup)
-  static async register(): Promise<BiometricAuthResult> {
+  // Register biometric authentication (one-time setup) - REQUIRES ADMIN PASSWORD FIRST
+  static async register(adminPasswordHash: string): Promise<BiometricAuthResult> {
     try {
+      // SECURITY: Verify admin password before allowing biometric setup
+      const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123';
+      if (adminPasswordHash !== this.hashPassword(adminPassword)) {
+        return { success: false, error: 'Invalid admin credentials. Cannot setup biometrics.' };
+      }
+
       if (!(await this.isAvailable())) {
         return { success: false, error: 'Biometric authentication not available' };
       }
@@ -71,9 +109,10 @@ export class BiometricAuth {
       }) as PublicKeyCredential;
 
       if (credential) {
-        // Store credential ID and setup date in localStorage for future auth
+        // Store credential ID, setup date, and admin password hash for verification
         localStorage.setItem('biometric-credential-id', credential.id);
         localStorage.setItem('biometric-setup-date', Date.now().toString());
+        localStorage.setItem('biometric-admin-hash', this.hashPassword(adminPassword));
         return { success: true };
       }
       

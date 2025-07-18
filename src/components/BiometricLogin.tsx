@@ -4,11 +4,13 @@ import { BiometricAuth } from '../utils/biometricAuth';
 interface BiometricLoginProps {
   onSuccess: () => void;
   onFallbackToPassword: () => void;
+  adminPassword?: string; // Required for biometric setup
 }
 
 export const BiometricLogin: React.FC<BiometricLoginProps> = ({ 
   onSuccess, 
-  onFallbackToPassword 
+  onFallbackToPassword,
+  adminPassword 
 }) => {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isSetup, setIsSetup] = useState(false);
@@ -33,16 +35,52 @@ export const BiometricLogin: React.FC<BiometricLoginProps> = ({
   };
 
   const handleResetBiometric = () => {
-    BiometricAuth.clearSetup();
-    setIsSetup(false);
-    setError('');
+    if (!adminPassword) {
+      setError('Admin password required to reset biometric setup');
+      return;
+    }
+    
+    // Hash the admin password for verification
+    const hashPassword = (password: string): string => {
+      let hash = 0;
+      for (let i = 0; i < password.length; i++) {
+        const char = password.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash).toString(36);
+    };
+    
+    const success = BiometricAuth.clearSetup(hashPassword(adminPassword));
+    if (success) {
+      setIsSetup(false);
+      setError('');
+    } else {
+      setError('Unauthorized: Cannot reset biometric setup');
+    }
   };
 
   const handleSetupBiometric = async () => {
+    if (!adminPassword) {
+      setError('Admin password required for biometric setup');
+      return;
+    }
+    
     setIsAuthenticating(true);
     setError('');
     
-    const result = await BiometricAuth.register();
+    // Hash the admin password for verification
+    const hashPassword = (password: string): string => {
+      let hash = 0;
+      for (let i = 0; i < password.length; i++) {
+        const char = password.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash).toString(36);
+    };
+    
+    const result = await BiometricAuth.register(hashPassword(adminPassword));
     
     if (result.success) {
       setIsSetup(true);
@@ -160,13 +198,19 @@ export const BiometricLogin: React.FC<BiometricLoginProps> = ({
           Use Password Instead
         </button>
 
-        {isSetup && (
+        {isSetup && adminPassword && (
           <button
             onClick={handleResetBiometric}
-            className="w-full px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm"
+            className="w-full px-4 py-2 text-red-400 hover:text-red-300 transition-colors text-sm border border-red-600/30 rounded-lg"
           >
-            Reset Biometric Setup
+            🚨 Reset Biometric Setup (Admin Only)
           </button>
+        )}
+        
+        {isSetup && !adminPassword && (
+          <div className="text-xs text-gray-500 text-center px-2">
+            ⚠️ Biometric reset requires admin authentication
+          </div>
         )}
       </div>
     </div>

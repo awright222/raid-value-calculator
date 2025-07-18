@@ -201,6 +201,7 @@ function App() {
                 <BiometricLogin
                   onSuccess={handleBiometricSuccess}
                   onFallbackToPassword={handleBiometricFallback}
+                  adminPassword={ADMIN_PASSWORD}
                 />
               </motion.div>
             </motion.div>
