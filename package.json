@@ -1,8 +1,28 @@
 {
-  "name": "raidvaluecalc",
-  "private": true,
-  "version": "0.0.0",
+  "name": "raid-value-calculator",
+  "private": false,
+  "version": "1.0.0",
+  "description": "An intelligent pack value analyzer for Raid Shadow Legends players",
+  "author": "Alex Wright",
+  "license": "MIT",
   "type": "module",
+  "homepage": "https://github.com/awright222/raid-value-calculator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awright222/raid-value-calculator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/awright222/raid-value-calculator/issues"
+  },
+  "keywords": [
+    "raid-shadow-legends",
+    "pack-calculator",
+    "value-analyzer",
+    "gaming-tools",
+    "react",
+    "typescript",
+    "firebase"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

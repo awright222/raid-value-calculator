@@ -6,6 +6,7 @@ import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem
 import { savePackAnalysis } from '../firebase/historical';
 import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
 import { useAnalytics } from '../services/analytics';
+import { checkRateLimit, showRateLimitWarning } from '../utils/rateLimiter';
 import { Timestamp } from 'firebase/firestore';
 
 interface AnalysisResult {
@@ -145,6 +146,12 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   };
 
   const handleAnalyze = async () => {
+    // Check rate limit first
+    if (!checkRateLimit('PACK_ANALYSIS')) {
+      showRateLimitWarning('PACK_ANALYSIS');
+      return;
+    }
+
     if (!price) {
       setError('Price is required');
       return;
@@ -216,6 +223,17 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
         itemCount: packItems.length,
         hasEnergyPots: packItems.some(item => item.itemTypeId === 'energy_pot'),
         hasRawEnergy: packItems.some(item => item.itemTypeId === 'raw_energy')
+      });
+
+      // Track pack view for analytics dashboard
+      analytics.trackPackView({
+        packName: packItems.map(item => {
+          const itemType = getItemTypeById(item.itemTypeId);
+          return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
+        }).join(', '),
+        price: parseFloat(price),
+        grade: resultData.grade,
+        energyValue: totalEnergy
       });
         
       // Save pack analysis to historical data

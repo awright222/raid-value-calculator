@@ -1,55 +1,79 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is admin (basic password check)
+    // Helper function to check if user is admin
     function isAdmin() {
       return request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Rate limiting helper - prevent spam
+    function isWithinRateLimit() {
+      // Only allow writes if they're reasonable size
+      return request.writeFields.size() <= 50; // Max 50 fields per write
+    }
+    
+    // Validate pack data to prevent abuse
+    function isValidPackData() {
+      return request.resource.data.keys().hasAll(['packName', 'packPrice']) &&
+             request.resource.data.packPrice is number &&
+             request.resource.data.packPrice >= 0.01 &&
+             request.resource.data.packPrice <= 1000.00; // Reasonable price range
     }
     
     // Public read access to packs (anyone can view pack data)
     match /packs/{packId} {
       allow read: if true;
-      // Allow writes only for admin or temporary public submission (you can tighten this later)
-      allow write: if true; // TEMPORARY: Enable for community submissions, secure later
+      // Restrict pack writes to reasonable data only
+      allow write: if isValidPackData() && isWithinRateLimit();
     }
     
-    // Public read access to historical data for analytics
+    // Restrict historical data writes
     match /pack_analysis_history/{analysisId} {
       allow read: if true;
-      allow write: if true; // Allow pack analysis submissions
+      allow write: if isWithinRateLimit() && 
+                     request.resource.data.keys().hasAll(['packName']) &&
+                     request.resource.data.packName is string &&
+                     request.resource.data.packName.size() <= 200; // Max 200 chars
     }
     
+    // Price snapshots - controlled writes
     match /price_snapshots/{snapshotId} {
       allow read: if true;
-      allow write: if true; // Allow price tracking
+      allow write: if isWithinRateLimit();
     }
     
+    // Market trends - controlled writes  
     match /market_trends/{trendId} {
       allow read: if true;
-      allow write: if true; // Allow trend calculations
+      allow write: if isWithinRateLimit();
     }
     
-    // New pack intelligence collections
+    // Pack intelligence - controlled
     match /pack_data_history/{historyId} {
       allow read: if true;
-      allow write: if true; // Allow pack history tracking
+      allow write: if isWithinRateLimit();
     }
     
     match /pack_market_intelligence/{intelligenceId} {
       allow read: if true;
-      allow write: if true; // Allow intelligence generation
+      allow write: if isWithinRateLimit();
     }
     
     // Pending packs - more restrictive
     match /pending_packs/{packId} {
       allow read: if false; // Only admin should see pending
-      allow write: if true; // Allow community submissions to pending
+      allow write: if isValidPackData() && isWithinRateLimit();
     }
     
-    // Analytics events - write-only for privacy
+    // Analytics events - write-only for privacy with strict limits
     match /analytics_events/{eventId} {
       allow read: if false; // Privacy: users can't read analytics
-      allow write: if true;  // Allow anonymous analytics submission
+      allow write: if isWithinRateLimit() &&
+                     request.resource.data.keys().hasAll(['eventType']) &&
+                     request.resource.data.eventType is string &&
+                     request.resource.data.eventType in ['pack_view', 'user_engagement', 'conversion'] &&
+                     // Limit event data size
+                     request.resource.data.size() <= 20; // Max 20 fields per analytics event
     }
     
     // Default: deny all other access

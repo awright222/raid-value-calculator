@@ -1,4 +1,5 @@
 import { useConsent } from '../context/ConsentContext';
+import { checkRateLimit } from '../utils/rateLimiter';
 
 // Privacy-compliant analytics service
 class PrivacyAnalytics {
@@ -106,6 +107,12 @@ class PrivacyAnalytics {
   // Send data to analytics service
   private async trackEvent(eventType: string, data: Record<string, any>) {
     try {
+      // Rate limiting check
+      if (!checkRateLimit('ANALYTICS_EVENT')) {
+        console.warn('Analytics rate limit reached, skipping event:', eventType);
+        return;
+      }
+
       // Remove any potentially identifying information
       const anonymizedData = this.anonymizeData(data);
       
