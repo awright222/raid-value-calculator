@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import GradeDisplay from './GradeDisplay';
-import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, calculatePackValue, type PackItem } from '../types/itemTypes';
-import { analyzePackValue } from '../firebase/database';
+import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
+import { analyzePackValue, getAllPacks } from '../firebase/database';
 
 interface AnalysisResult {
   total_energy: number;
@@ -25,6 +25,45 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [itemPrices, setItemPrices] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    loadItemPrices();
+  }, []);
+
+  const loadItemPrices = async () => {
+    try {
+      const packs = await getAllPacks();
+      const itemStats: Record<string, { totalCost: number; totalQuantity: number }> = {};
+      
+      packs.forEach(pack => {
+        if (!pack.items || pack.items.length === 0) return;
+        
+        const totalItems = pack.items.reduce((sum, item) => sum + item.quantity, 0);
+        
+        pack.items.forEach(item => {
+          if (!itemStats[item.itemTypeId]) {
+            itemStats[item.itemTypeId] = { totalCost: 0, totalQuantity: 0 };
+          }
+          
+          const itemProportion = item.quantity / totalItems;
+          const itemCost = pack.price * itemProportion;
+          
+          itemStats[item.itemTypeId].totalCost += itemCost;
+          itemStats[item.itemTypeId].totalQuantity += item.quantity;
+        });
+      });
+
+      const prices: Record<string, number> = {};
+      Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
+        prices[itemTypeId] = stats.totalCost / stats.totalQuantity;
+      });
+      
+      setItemPrices(prices);
+    } catch (error) {
+      console.error('Error loading item prices:', error);
+    }
+  };
 
   const addItem = () => {
     setPackItems([...packItems, { itemTypeId: '', quantity: 0 }]);
@@ -54,12 +93,40 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   };
 
   const getPackValueAnalysis = () => {
-    const packValue = calculatePackValue(packItems);
+    let totalMarketValue = 0;
+    const itemBreakdown: Array<{
+      itemType: any;
+      quantity: number;
+      marketValue: number;
+      energyEquivalent: number;
+    }> = [];
+
+    packItems.forEach(item => {
+      const itemType = getItemTypeById(item.itemTypeId);
+      const pricePerItem = itemPrices[item.itemTypeId] || 0;
+      const itemMarketValue = item.quantity * pricePerItem;
+      
+      totalMarketValue += itemMarketValue;
+      
+      itemBreakdown.push({
+        itemType,
+        quantity: item.quantity,
+        marketValue: itemMarketValue,
+        energyEquivalent: itemType?.baseValue ? item.quantity * itemType.baseValue : 0
+      });
+    });
+
+    const actualPrice = parseFloat(price) || 0;
+    const discountPercent = totalMarketValue > 0 ? ((totalMarketValue - actualPrice) / totalMarketValue) * 100 : 0;
+
     return {
-      ...packValue,
-      actualPrice: parseFloat(price) || 0,
-      valueVsMarket: parseFloat(price) ? (packValue.totalMarketValue / parseFloat(price)) : 0,
-      discountPercent: parseFloat(price) ? ((packValue.totalMarketValue - parseFloat(price)) / packValue.totalMarketValue) * 100 : 0
+      totalMarketValue,
+      totalEnergyEquivalent: calculateTotalEnergy(),
+      costPerEnergyEquivalent: 0,
+      itemBreakdown,
+      actualPrice,
+      valueVsMarket: actualPrice > 0 ? (totalMarketValue / actualPrice) : 0,
+      discountPercent
     };
   };
 
