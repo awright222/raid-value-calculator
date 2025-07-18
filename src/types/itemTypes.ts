@@ -58,6 +58,14 @@ export const ITEM_TYPES: ItemType[] = [
     energyEquivalent: 0.4, // Energy equivalent based on farming efficiency
     description: 'In-game currency for upgrades and purchases'
   },
+  {
+    id: 'gems',
+    name: 'Gems',
+    category: ITEM_CATEGORIES.CURRENCY,
+    marketValue: 0.01, // ~$0.01 per gem (100 gems ≈ $1)
+    energyEquivalent: 20, // Energy equivalent based on energy refill value
+    description: 'Premium currency for energy, masteries, and purchases'
+  },
 
   // Leveling
   {
