@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById } from '../types/itemTypes';
+import RateLimitInfo from './RateLimitInfo';
 
 interface PackSubmissionProps {
   onSubmissionComplete?: (success: boolean, message: string) => void;
@@ -168,9 +169,12 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       className="glass-effect rounded-2xl p-8 shadow-2xl max-w-4xl mx-auto"
     >
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
-          Submit a Pack
-        </h2>
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+            Submit a Pack
+          </h2>
+          <RateLimitInfo />
+        </div>
         <p className="text-secondary-600">
           Help the community by submitting pack data. Packs need 3 confirmations to be approved.
         </p>

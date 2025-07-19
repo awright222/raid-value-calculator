@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import GradeDisplay from './GradeDisplay';
 import ConfidenceIndicator from './ConfidenceIndicator';
+import RateLimitInfo from './RateLimitInfo';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { savePackAnalysis } from '../firebase/historical';
 import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
@@ -340,14 +341,17 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       >
         <div className="flex items-center justify-between mb-8">
           <div>
-            <motion.h2 
-              className="text-3xl font-bold bg-gradient-to-r from-secondary-700 to-primary-600 bg-clip-text text-transparent"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              Analyze Pack Value
-            </motion.h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <div className="flex items-center gap-2 mb-2">
+              <motion.h2 
+                className="text-3xl font-bold bg-gradient-to-r from-secondary-700 to-primary-600 bg-clip-text text-transparent"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                Analyze Pack Value
+              </motion.h2>
+              <RateLimitInfo />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               📊 Estimates based on community data - results may vary. Not financial advice.
             </p>
           </div>
@@ -703,22 +707,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                     </div>
                   )}
 
-                  {result.total_energy === 0 && (
-                    <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200/50 rounded-xl">
-                      <h4 className="text-lg font-bold text-yellow-700 dark:text-yellow-300 mb-2">New Item Analysis</h4>
-                      <p className="text-yellow-800">
-                        This pack contains non-energy items. Value analysis is based on estimated market rates. 
-                        {(() => {
-                          const valueAnalysis = getPackValueAnalysis();
-                          return valueAnalysis.discountPercent > 10 ? 
-                            ' This looks like a great deal!' :
-                            valueAnalysis.discountPercent > 0 ?
-                            ' This appears to be a decent value.' :
-                            ' Consider if these items align with your current needs.';
-                        })()}
-                      </p>
-                    </div>
-                  )}
+                  {/* Analysis Content - continues to similar packs section */}
                 </div>
               </motion.div>
             )}
