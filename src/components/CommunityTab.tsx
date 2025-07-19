@@ -1,17 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import PackSubmission from './PackSubmission';
-import PendingPacks from './PendingPacks';
+import { PackSubmission } from './PackSubmission';
+import { PendingPacks } from './PendingPacks';
 
-console.log('📁 CommunityTab.tsx file loaded');
-
-interface CommunityTabProps {
-  userEmail?: string;
-}
-
-export function CommunityTab({ userEmail }: CommunityTabProps) {
+export default function CommunityTab() {
   const [activeSubTab, setActiveSubTab] = useState<'submit' | 'pending'>('pending');
-  console.log('🏷️ CommunityTab activeSubTab:', activeSubTab);
   
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -64,10 +57,7 @@ export function CommunityTab({ userEmail }: CommunityTabProps) {
           {subTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => {
-                console.log('🔄 Switching to tab:', tab.id);
-                setActiveSubTab(tab.id);
-              }}
+              onClick={() => setActiveSubTab(tab.id)}
               className={`relative px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
                 activeSubTab === tab.id
                   ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-lg'
@@ -108,7 +98,7 @@ export function CommunityTab({ userEmail }: CommunityTabProps) {
           />
         )}
         {activeSubTab === 'pending' && (
-          <PendingPacks userEmail={userEmail} />
+          <PendingPacks />
         )}
       </motion.div>
 
@@ -164,5 +154,3 @@ export function CommunityTab({ userEmail }: CommunityTabProps) {
     </div>
   );
 }
-
-export default CommunityTab;

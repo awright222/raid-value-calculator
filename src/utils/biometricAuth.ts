@@ -36,10 +36,9 @@ export class BiometricAuth {
   // Clear stored credentials (reset biometric setup) - ADMIN ONLY
   static clearSetup(adminPasswordHash?: string): boolean {
     // Allow reset only if admin password is provided or if credentials are stale
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123';
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'RaidX9$mK7#vP2@nQ8!wE5';
     
     if (adminPasswordHash && adminPasswordHash !== this.hashPassword(adminPassword)) {
-      console.warn('🚨 Unauthorized attempt to reset biometric credentials');
       return false;
     }
     
@@ -60,9 +59,8 @@ export class BiometricAuth {
     }
     
     // Verify the stored admin hash matches current admin password
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123';
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'RaidX9$mK7#vP2@nQ8!wE5';
     if (storedAdminHash !== this.hashPassword(adminPassword)) {
-      console.warn('🚨 Admin password changed - invalidating biometric credentials');
       this.clearSetup();
       return false;
     }
@@ -76,7 +74,7 @@ export class BiometricAuth {
   static async register(adminPasswordHash: string): Promise<BiometricAuthResult> {
     try {
       // SECURITY: Verify admin password before allowing biometric setup
-      const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123';
+      const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'RaidX9$mK7#vP2@nQ8!wE5';
       if (adminPasswordHash !== this.hashPassword(adminPassword)) {
         return { success: false, error: 'Invalid admin credentials. Cannot setup biometrics.' };
       }

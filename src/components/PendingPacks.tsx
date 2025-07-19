@@ -22,7 +22,6 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
       const packs = await getPendingPacks();
       setPendingPacks(packs);
     } catch (error) {
-      console.error('Error loading pending packs:', error);
       setMessage({ type: 'error', text: 'Failed to load pending packs' });
     } finally {
       setLoading(false);
@@ -53,7 +52,6 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
         setMessage({ type: 'error', text: result.message });
       }
     } catch (error) {
-      console.error('Error confirming pack:', error);
       setMessage({ type: 'error', text: 'Failed to confirm pack' });
     } finally {
       setConfirmingPacks(prev => {

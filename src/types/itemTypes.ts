@@ -229,7 +229,7 @@ export function getAllCategories(): string[] {
   return Object.values(ITEM_CATEGORIES);
 }
 
-export function calculatePackValue(packItems: PackItem[]): {
+export function calculatePackValue(_packItems: PackItem[]): {
   totalMarketValue: number;
   totalEnergyEquivalent: number;
   costPerEnergyEquivalent: number;
@@ -243,7 +243,6 @@ export function calculatePackValue(packItems: PackItem[]): {
   // This function now returns empty values since market values are calculated
   // dynamically from actual pack data in the components
   // packItems parameter kept for backwards compatibility
-  console.log('calculatePackValue called with', packItems.length, 'items');
   
   return {
     totalMarketValue: 0,

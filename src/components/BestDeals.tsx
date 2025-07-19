@@ -159,7 +159,7 @@ export default function BestDeals() {
 
       setBestPacks(packsWithValue);
     } catch (error) {
-      console.error('Error loading best deals:', error);
+      // Error loading best deals - will show empty state
     } finally {
       setLoading(false);
     }

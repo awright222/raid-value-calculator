@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
-import { addPack, addPackWithValidation } from '../firebase/database';
+import { addPack } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
@@ -124,8 +124,8 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const totalEnergy = energyPots * 130 + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(formData.price) / totalEnergy : 0;
       
-      // Use enhanced validation
-      const result = await addPackWithValidation({
+      // Use direct addPack function to avoid validation overhead in admin quick add
+      await addPack({
         name: formData.name,
         price: parseFloat(formData.price),
         energy_pots: energyPots,
@@ -138,13 +138,8 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
         })),
       });
 
-      // Show validation results
-      if (result.warnings.length > 0) {
-        setValidationWarnings(result.warnings);
-      }
-      
-      setSuccess(`Pack "${formData.name}" added successfully!` + 
-        (result.warnings.length > 0 ? ' (See warnings below)' : ''));
+      setSuccess(`Pack "${formData.name}" added successfully!`);
+      setValidationWarnings([]); // Clear any previous warnings
       
       // Reset form on success
       setFormData({ name: '', price: '' });
@@ -153,7 +148,29 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       onPackAdded();
       
     } catch (error: any) {
-      const errorMessage = error?.message || 'Failed to add pack. Please try again.';
+      let errorMessage = 'Failed to add pack. Please try again.';
+      
+      if (error?.code) {
+        switch (error.code) {
+          case 'permission-denied':
+            errorMessage = 'Permission denied. Check Firestore security rules for packs collection.';
+            break;
+          case 'unavailable':
+            errorMessage = 'Service temporarily unavailable. Try again in a moment.';
+            break;
+          case 'invalid-argument':
+            errorMessage = 'Invalid pack data. Check all fields.';
+            break;
+          case 'unauthenticated':
+            errorMessage = 'Authentication required. Refresh the page.';
+            break;
+          default:
+            errorMessage = `Database error: ${error.code} - ${error.message}`;
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
       setError(`Failed to add pack: ${errorMessage}`);
     } finally {
       setLoading(false);

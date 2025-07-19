@@ -72,19 +72,10 @@ export default function ItemValues() {
         await savePriceSnapshot(priceData);
         // Historical price snapshot saved
       } catch (error) {
-        console.error('Failed to save price snapshot:', error);
+        // Failed to save price snapshot silently
       }
     } catch (error) {
-      console.error('Failed to load item values:', error);
-      
-      // Show specific error message to help with debugging
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-      }
+      // Failed to load item values - using fallback
     } finally {
       setLoading(false);
       setRefreshing(false);

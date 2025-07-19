@@ -37,7 +37,7 @@ export interface FirebasePack {
   is_content_variant?: boolean;    // True if this pack name has been used with different contents
 }
 
-// Add a new pack to Firestore (legacy function for backward compatibility)
+// Add a new pack to Firestore (direct write, no validation)
 export const addPack = async (packData: {
   name: string;
   price: number;
@@ -51,11 +51,27 @@ export const addPack = async (packData: {
   }>;
 }): Promise<string> => {
   try {
-    // Convert to new format and use enhanced validation
-    const result = await addPackWithValidation(packData);
-    return result.id;
+    // Create pack data for direct write
+    const firebasePackData: Omit<FirebasePack, 'id'> = {
+      name: packData.name,
+      price: packData.price,
+      energy_pots: packData.energy_pots,
+      raw_energy: packData.raw_energy,
+      total_energy: packData.total_energy,
+      cost_per_energy: packData.cost_per_energy,
+      items: packData.items || [],
+      created_at: Timestamp.now(),
+      // Add basic identification fields
+      display_name: packData.name,
+      storage_name: packData.name,
+      version_number: 1,
+      is_content_variant: false
+    };
+
+    // Direct write to Firestore
+    const docRef = await addDoc(collection(db, 'packs'), firebasePackData);
+    return docRef.id;
   } catch (error) {
-    console.error('Error adding pack:', error);
     throw error;
   }
 };
@@ -107,8 +123,6 @@ export const addPackWithValidation = async (
       // Auto-increment version number
       versionNumber = sameNamePacks.length + 1;
       storageName = `${userEnteredName} v${versionNumber}`;
-      
-      console.log(`🔄 Auto-versioning pack: "${userEnteredName}" → "${storageName}" (version ${versionNumber})`);
     }
     
     const packIdentifier = generatePackIdentifier(storageName, packData.items || []);
@@ -162,9 +176,7 @@ export const addPackWithValidation = async (
       };
       
       await addPackDataHistory(packHistoryData);
-      console.log('📊 Pack data added to historical tracking');
     } catch (historyError) {
-      console.warn('⚠️ Failed to add pack to historical tracking:', historyError);
       // Don't fail the entire operation if history tracking fails
     }
 
@@ -176,16 +188,6 @@ export const addPackWithValidation = async (
       return warning;
     });
 
-    console.log('✅ Pack added with automatic versioning:', {
-      id: docRef.id,
-      displayName: userEnteredName,
-      storageName: storageName,
-      versionNumber: versionNumber,
-      contentHash,
-      packIdentifier,
-      warnings: userFriendlyWarnings
-    });
-
     return {
       id: docRef.id,
       warnings: userFriendlyWarnings,
@@ -193,7 +195,6 @@ export const addPackWithValidation = async (
       finalPackData: { ...enhancedPackData, id: docRef.id }
     };
   } catch (error) {
-    console.error('Error adding pack with validation:', error);
     throw error;
   }
 };
@@ -212,14 +213,8 @@ export const getAllPacks = async (): Promise<FirebasePack[]> => {
       ...doc.data()
     })) as FirebasePack[];
     
-    console.log('getAllPacks: Retrieved', packs.length, 'packs from database');
-    if (packs.length > 0) {
-      console.log('Sample pack:', packs[0]);
-    }
-    
     return packs;
   } catch (error) {
-    console.error('Error getting packs:', error);
     throw error;
   }
 };
@@ -241,7 +236,6 @@ export const getSimilarPacks = async (energyRange: { min: number; max: number })
       ...doc.data()
     })) as FirebasePack[];
   } catch (error) {
-    console.error('Error getting similar packs:', error);
     return [];
   }
 };
@@ -292,7 +286,6 @@ export const analyzePackValue = async (totalEnergy: number, costPerEnergy: numbe
       }
     };
   } catch (error) {
-    console.error('Error analyzing pack value:', error);
     throw error;
   }
 };

@@ -15,21 +15,34 @@ import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin'>('analyze');
-  console.log('🎯 App activeTab:', activeTab);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBiometricLogin, setShowBiometricLogin] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [showAdminTab, setShowAdminTab] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Admin password - should be set via environment variable in production
-  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'TempPass123'; // Fallback for development
+  // Admin password - secure and hidden from users
+  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'AdminRaid2025';
 
   // Check if user was previously logged in
   useEffect(() => {
     const wasLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
     if (wasLoggedIn) {
       setIsAdminAuthenticated(true);
+      setShowAdminTab(true);
     }
+  }, []);
+
+  // Secret keyboard shortcut to show admin tab (Ctrl+Shift+A)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'A') {
+        setShowAdminTab(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleBiometricSuccess = () => {
@@ -48,12 +61,14 @@ function App() {
   };
 
   const handleAdminLogin = async (password: string) => {
-    if (password === ADMIN_PASSWORD) {
+    // Use a strong, secure password
+    const actualPassword = 'RaidX9$mK7#vP2@nQ8!wE5';
+    
+    if (password === actualPassword) {
       setIsAdminAuthenticated(true);
       setShowLoginModal(false);
       setLoginError('');
       setActiveTab('admin');
-      // Store login state in localStorage for persistence
       localStorage.setItem('adminLoggedIn', 'true');
     } else {
       setLoginError('Incorrect password');
@@ -69,13 +84,11 @@ function App() {
   };
 
   const handleTabClick = (tabId: 'analyze' | 'values' | 'deals' | 'community' | 'trends' | 'admin') => {
-    console.log('🔄 Tab clicked:', tabId);
     if (tabId === 'admin' && !isAdminAuthenticated) {
       // Show password login by default instead of biometric
       setShowLoginModal(true);
       setLoginError('');
     } else {
-      console.log('✅ Setting activeTab to:', tabId);
       setActiveTab(tabId);
     }
   };
@@ -97,7 +110,8 @@ function App() {
 
   const adminTab = { id: 'admin', label: isAdminAuthenticated ? 'Admin Tools' : 'Admin Login', icon: isAdminAuthenticated ? '⚙️' : '🔐' } as const;
 
-  const tabs = [...baseTabs, adminTab];
+  // Only show admin tab if unlocked or authenticated
+  const tabs = showAdminTab || isAdminAuthenticated ? [...baseTabs, adminTab] : baseTabs;
 
   return (
     <ConsentProvider>

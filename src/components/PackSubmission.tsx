@@ -135,28 +135,27 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       }
 
     } catch (error) {
-      console.error('Submission error:', error);
+      let errorMessage = 'Failed to submit pack. Please try again.';
       
-      // Log more detailed error information
       if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-        setSubmitMessage({ 
-          type: 'error', 
-          text: `Failed to submit pack: ${error.message}` 
-        });
-      } else {
-        console.error('Unknown error:', error);
-        setSubmitMessage({ 
-          type: 'error', 
-          text: 'Failed to submit pack. Please try again.' 
-        });
+        errorMessage = `Failed to submit pack: ${error.message}`;
+        
+        // Check for specific Firebase errors
+        if (error.message.includes('permission-denied')) {
+          errorMessage = 'Permission denied. Please check your connection and try again.';
+        } else if (error.message.includes('unavailable')) {
+          errorMessage = 'Service temporarily unavailable. Please try again in a moment.';
+        } else if (error.message.includes('invalid-argument')) {
+          errorMessage = 'Invalid pack data. Please check all fields and try again.';
+        }
       }
       
-      onSubmissionComplete?.(false, 'Failed to submit pack');
+      setSubmitMessage({ 
+        type: 'error', 
+        text: errorMessage
+      });
+      
+      onSubmissionComplete?.(false, errorMessage);
     } finally {
       setIsSubmitting(false);
     }

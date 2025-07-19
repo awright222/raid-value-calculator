@@ -45,11 +45,8 @@ export const submitPendingPack = async (
   submitterEmail?: string
 ): Promise<{ success: boolean; packId?: string; message: string; duplicateFound?: boolean }> => {
   try {
-    console.log('🚀 Starting pack submission:', { packData, submitterId, submitterEmail });
-    
     // Validate pack data
     const validation = validatePackData(packData);
-    console.log('📝 Validation result:', validation);
     if (!validation.isValid) {
       return {
         success: false,
@@ -176,10 +173,26 @@ export const submitPendingPack = async (
     };
 
   } catch (error) {
-    console.error('Error submitting pack:', error);
+    let errorMessage = 'Failed to submit pack. Please try again.';
+    
+    if (error instanceof Error) {
+      // Provide more specific error messages based on Firebase error codes
+      if (error.message.includes('permission-denied')) {
+        errorMessage = 'Permission denied. Unable to submit pack to database.';
+      } else if (error.message.includes('unavailable')) {
+        errorMessage = 'Database temporarily unavailable. Please try again in a moment.';
+      } else if (error.message.includes('invalid-argument')) {
+        errorMessage = 'Invalid pack data format. Please check all fields.';
+      } else if (error.message.includes('unauthenticated')) {
+        errorMessage = 'Authentication required. Please refresh the page and try again.';
+      } else {
+        errorMessage = `Submission failed: ${error.message}`;
+      }
+    }
+    
     return {
       success: false,
-      message: 'Failed to submit pack. Please try again.'
+      message: errorMessage
     };
   }
 };
@@ -202,8 +215,6 @@ export const getPendingPacks = async (): Promise<PendingPack[]> => {
       expires_at: doc.data().expires_at.toDate()
     } as PendingPack));
   } catch (error) {
-    console.error('Error with optimized query, trying fallback:', error);
-    
     // Fallback: use simpler query without orderBy if index is still building
     try {
       const fallbackQuery = query(
@@ -222,7 +233,6 @@ export const getPendingPacks = async (): Promise<PendingPack[]> => {
       // Sort in memory since we can't use orderBy
       return packs.sort((a, b) => b.submitted_at.getTime() - a.submitted_at.getTime());
     } catch (fallbackError) {
-      console.error('Error with fallback query:', fallbackError);
       return [];
     }
   }
@@ -273,7 +283,6 @@ export const confirmPendingPack = async (packId: string, userId: string): Promis
     };
 
   } catch (error) {
-    console.error('Error confirming pack:', error);
     return { success: false, message: 'Failed to confirm pack' };
   }
 };
@@ -311,7 +320,6 @@ export const approvePendingPack = async (packId: string): Promise<boolean> => {
 
     return true;
   } catch (error) {
-    console.error('Error approving pack:', error);
     return false;
   }
 };
@@ -336,7 +344,6 @@ export const cleanupExpiredPacks = async (): Promise<number> => {
 
     return deletedCount;
   } catch (error) {
-    console.error('Error cleaning up expired packs:', error);
     return 0;
   }
 };
@@ -348,7 +355,6 @@ export const deletePendingPack = async (packId: string): Promise<boolean> => {
     await deleteDoc(packRef);
     return true;
   } catch (error) {
-    console.error('Error deleting pending pack:', error);
     return false;
   }
 };
