@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
 import { addPack } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
+import { testFirebaseConnection } from '../firebase/connectionTest';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import type { PendingPack } from '../utils/duplicateDetection';
@@ -38,6 +39,13 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
   const [maintenanceStats, setMaintenanceStats] = useState({
     expiredCleaned: 0,
     lastCleanup: null as Date | null
+  });
+  const [connectionTest, setConnectionTest] = useState<{
+    testing: boolean;
+    result: any;
+  }>({
+    testing: false,
+    result: null
   });
 
   const adminTabs = [
@@ -314,6 +322,27 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       setError('Failed to cleanup expired packs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Firebase connection test
+  const handleConnectionTest = async () => {
+    setConnectionTest({ testing: true, result: null });
+    setError('');
+    setSuccess('');
+    
+    try {
+      const result = await testFirebaseConnection();
+      setConnectionTest({ testing: false, result });
+      
+      if (result.success) {
+        setSuccess(`✅ ${result.message} (${result.packsCount} packs found)`);
+      } else {
+        setError(`❌ Connection failed: ${result.message} (Code: ${result.code})`);
+      }
+    } catch (error) {
+      setConnectionTest({ testing: false, result: { success: false, error } });
+      setError(`❌ Connection test error: ${error}`);
     }
   };
 
@@ -800,7 +829,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Cleanup Operations */}
               <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -825,6 +854,44 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                     <div className="text-sm text-secondary-600">
                       <p>Last cleanup: {maintenanceStats.lastCleanup.toLocaleString()}</p>
                       <p>Expired packs removed: {maintenanceStats.expiredCleaned}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Firebase Connection Test */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <span className="mr-2">🔥</span>
+                  Firebase Connection
+                </h3>
+                
+                <div className="space-y-4">
+                  <button
+                    onClick={handleConnectionTest}
+                    disabled={connectionTest.testing}
+                    className={`w-full py-3 rounded-lg font-medium transition-all ${
+                      connectionTest.testing
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {connectionTest.testing ? 'Testing...' : 'Test Firebase Connection'}
+                  </button>
+
+                  {connectionTest.result && (
+                    <div className={`text-sm p-3 rounded-lg ${
+                      connectionTest.result.success 
+                        ? 'bg-green-50 text-green-800 border border-green-200' 
+                        : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
+                      <p className="font-medium">
+                        {connectionTest.result.success ? '✅ Connected' : '❌ Failed'}
+                      </p>
+                      <p className="text-xs mt-1">{connectionTest.result.message}</p>
+                      {connectionTest.result.code && (
+                        <p className="text-xs mt-1">Code: {connectionTest.result.code}</p>
+                      )}
                     </div>
                   )}
                 </div>

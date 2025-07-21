@@ -19,6 +19,5 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services
 export const db = getFirestore(app);
-// Removed auth initialization to prevent CONFIGURATION_NOT_FOUND error
-// export const auth = getAuth(app);
+
 export default app;

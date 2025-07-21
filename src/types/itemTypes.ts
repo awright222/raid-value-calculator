@@ -23,6 +23,9 @@ export const ITEM_CATEGORIES = {
   CURRENCY: 'Currency',
   LEVELING: 'Leveling',
   RANKING: 'Ranking Up',
+  ASCENSION: 'Ascension Potions',
+  GEAR_ASCENSION: 'Gear Ascension Items',
+  ACCESSORY_ASCENSION: 'Accessory Ascension Items',
   SUMMONING: 'Summoning Shards',
   SOUL_SUMMONING: 'Soul Summoning',
   SKILL_TOMES: 'Skill Tomes',
@@ -104,6 +107,90 @@ export const ITEM_TYPES: ItemType[] = [
     name: 'Meal',
     category: ITEM_CATEGORIES.RANKING,
     description: 'Special food item for champion ranking'
+  },
+
+  // Ascension Potions
+  {
+    id: 'superior_arcane_potion',
+    name: 'Superior Arcane Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Superior ascension potion for Arcane affinity champions'
+  },
+  {
+    id: 'superior_spirit_potion',
+    name: 'Superior Spirit Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Superior ascension potion for Spirit affinity champions'
+  },
+  {
+    id: 'superior_magic_potion',
+    name: 'Superior Magic Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Superior ascension potion for Magic affinity champions'
+  },
+  {
+    id: 'superior_force_potion',
+    name: 'Superior Force Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Superior ascension potion for Force affinity champions'
+  },
+  {
+    id: 'superior_void_potion',
+    name: 'Superior Void Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Superior ascension potion for Void affinity champions'
+  },
+
+  // Gear Ascension Items
+  {
+    id: 'lesser_oil',
+    name: 'Lesser Oil',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Lesser oil for gear ascension'
+  },
+  {
+    id: 'greater_oil',
+    name: 'Greater Oil',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Greater oil for gear ascension'
+  },
+  {
+    id: 'superior_oil',
+    name: 'Superior Oil',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Superior oil for gear ascension'
+  },
+  {
+    id: 'chaos_dust',
+    name: 'Chaos Dust',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Chaos dust for gear ascension'
+  },
+
+  // Accessory Ascension Items
+  {
+    id: 'lesser_extract',
+    name: 'Lesser Extract',
+    category: ITEM_CATEGORIES.ACCESSORY_ASCENSION,
+    description: 'Lesser extract for accessory ascension'
+  },
+  {
+    id: 'greater_extract',
+    name: 'Greater Extract',
+    category: ITEM_CATEGORIES.ACCESSORY_ASCENSION,
+    description: 'Greater extract for accessory ascension'
+  },
+  {
+    id: 'superior_extract',
+    name: 'Superior Extract',
+    category: ITEM_CATEGORIES.ACCESSORY_ASCENSION,
+    description: 'Superior extract for accessory ascension'
+  },
+  {
+    id: 'chaos_powder',
+    name: 'Chaos Powder',
+    category: ITEM_CATEGORIES.ACCESSORY_ASCENSION,
+    description: 'Chaos powder for accessory ascension'
   },
 
   // Summoning Shards

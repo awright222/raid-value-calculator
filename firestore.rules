@@ -31,6 +31,12 @@ service cloud.firestore {
       allow write: if true; // Allow community submissions without authentication
     }
     
+    // Allow connection test collection for diagnostics
+    match /connection_test/{testId} {
+      allow read: if true;
+      allow write: if true; // Allow connection testing
+    }
+    
     // Deny access to any other collections
     match /{document=**} {
       allow read, write: if false;
