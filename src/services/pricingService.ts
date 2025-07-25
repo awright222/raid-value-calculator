@@ -18,7 +18,7 @@ export interface PricingResult {
 export interface PackValueAnalysis {
   grade: 'SSS' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F' | 'NEW';
   totalValue: number;
-  dollarsPerDollar: number; // How much value you get per dollar spent
+  dollarsPerDollar: number; 
   comparison: {
     betterThanPercent: number;
     totalPacksCompared: number;
