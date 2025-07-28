@@ -132,7 +132,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const totalEnergy = energyPots * 130 + rawEnergy;
       const costPerEnergy = totalEnergy > 0 ? parseFloat(formData.price) / totalEnergy : 0;
       
-      // Use direct addPack function to avoid validation overhead in admin quick add
+      
       await addPack({
         name: formData.name,
         price: parseFloat(formData.price),
