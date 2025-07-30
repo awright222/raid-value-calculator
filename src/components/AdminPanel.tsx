@@ -325,7 +325,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     }
   };
 
-  // Firebase connection test - (temporary)
+  // Firebase connection test 
   const handleConnectionTest = async () => {
     setConnectionTest({ testing: true, result: null });
     setError('');
