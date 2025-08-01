@@ -4,7 +4,6 @@ export interface ItemType {
   category: string;
   baseValue?: number; // For items with fixed conversion rates (like energy pots)
   marketValue?: number; // Market value in USD for non-energy items
-  energyEquivalent?: number; // Energy equivalent for value comparison
   description?: string;
   utilityScore?: number; // 1-10 scale for gameplay utility (defaults to 5 if not set)
   utilityReasoning?: string; // Why this score was assigned
@@ -411,13 +410,10 @@ export function getAllCategories(): string[] {
 
 export function calculatePackValue(_packItems: PackItem[]): {
   totalMarketValue: number;
-  totalEnergyEquivalent: number;
-  costPerEnergyEquivalent: number;
   itemBreakdown: Array<{
     itemType: ItemType;
     quantity: number;
     marketValue: number;
-    energyEquivalent: number;
   }>;
 } {
   // This function now returns empty values since market values are calculated
@@ -426,8 +422,6 @@ export function calculatePackValue(_packItems: PackItem[]): {
   
   return {
     totalMarketValue: 0,
-    totalEnergyEquivalent: 0,
-    costPerEnergyEquivalent: 0,
     itemBreakdown: []
   };
 }

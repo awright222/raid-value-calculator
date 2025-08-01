@@ -209,9 +209,6 @@ export const PackIntelligence: React.FC<PackIntelligenceProps> = ({ packName }) 
                         Grade
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Energy Equiv.
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Items
                       </th>
                     </tr>
@@ -237,9 +234,6 @@ export const PackIntelligence: React.FC<PackIntelligenceProps> = ({ packName }) 
                           }`}>
                             {version.grade}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {version.contentSummary.energyEquivalent.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {version.contentSummary.itemCount} items
