@@ -6,6 +6,9 @@ export interface ItemType {
   marketValue?: number; // Market value in USD for non-energy items
   energyEquivalent?: number; // Energy equivalent for value comparison
   description?: string;
+  utilityScore?: number; // 1-10 scale for gameplay utility (defaults to 5 if not set)
+  utilityReasoning?: string; // Why this score was assigned
+  lastUtilityUpdate?: Date; // Track when reviewed
 }
 
 export interface PackItem {
@@ -33,20 +36,24 @@ export const ITEM_CATEGORIES = {
 } as const;
 
 export const ITEM_TYPES: ItemType[] = [
-  // Energy
+  // Energy - Essential for gameplay
   {
     id: 'energy_pot',
     name: 'Energy Pot',
     category: ITEM_CATEGORIES.ENERGY,
     baseValue: 130,
-    description: '1 Energy Pot = 130 Energy'
+    description: '1 Energy Pot = 130 Energy',
+    utilityScore: 9,
+    utilityReasoning: 'Essential for farming - always needed'
   },
   {
     id: 'raw_energy',
     name: 'Raw Energy',
     category: ITEM_CATEGORIES.ENERGY,
     baseValue: 1,
-    description: 'Direct energy units'
+    description: 'Direct energy units',
+    utilityScore: 9,
+    utilityReasoning: 'Essential for farming - always needed'
   },
 
   // Currency
@@ -54,13 +61,17 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'silver',
     name: 'Silver',
     category: ITEM_CATEGORIES.CURRENCY,
-    description: 'In-game currency for upgrades and purchases'
+    description: 'In-game currency for upgrades and purchases',
+    utilityScore: 8,
+    utilityReasoning: 'Constantly needed for gear upgrades and champion development'
   },
   {
     id: 'gems',
     name: 'Gems',
     category: ITEM_CATEGORIES.CURRENCY,
-    description: 'Premium currency for energy, masteries, and purchases'
+    description: 'Premium currency for energy, masteries, and purchases',
+    utilityScore: 7,
+    utilityReasoning: 'Useful but less efficient than energy packs for most players'
   },
 
   // Leveling
@@ -68,45 +79,59 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'xp_brew',
     name: 'XP Brew',
     category: ITEM_CATEGORIES.LEVELING,
-    description: 'Experience brew for champion leveling'
+    description: 'Experience brew for champion leveling',
+    utilityScore: 4,
+    utilityReasoning: 'Farmable in campaign - low priority for purchases'
   },
   {
     id: 'xp_barrel',
     name: 'XP Barrel',
     category: ITEM_CATEGORIES.LEVELING,
-    description: 'Large experience boost for champions'
+    description: 'Large experience boost for champions',
+    utilityScore: 4,
+    utilityReasoning: 'Farmable in campaign - low priority for purchases'
   },
   {
     id: 'xp_boost_1d',
     name: '100% XP Boost (1d.)',
     category: ITEM_CATEGORIES.LEVELING,
-    description: '100% XP boost for 1 day'
+    description: '100% XP boost for 1 day',
+    utilityScore: 6,
+    utilityReasoning: 'Useful for efficient farming periods'
   },
 
   // Ranking Up
   {
     id: 'chicken_3star',
-    name: '3⭐ Chicken',
+    name: '3 ⭐ Chicken',
     category: ITEM_CATEGORIES.RANKING,
-    description: '3-star food champion for ranking up'
+    description: '3-star food champion for ranking up',
+    utilityScore: 5,
+    utilityReasoning: 'Moderately useful - can be obtained through farming'
   },
   {
     id: 'chicken_4star',
-    name: '4⭐ Chicken',
+    name: '4 ⭐ Chicken',
     category: ITEM_CATEGORIES.RANKING,
-    description: '4-star food champion for ranking up'
+    description: '4-star food champion for ranking up',
+    utilityScore: 6,
+    utilityReasoning: 'More valuable than 3-star, harder to obtain'
   },
   {
     id: 'chicken_5star',
-    name: '5⭐ Chicken',
+    name: '5 ⭐ Chicken',
     category: ITEM_CATEGORIES.RANKING,
-    description: '5-star food champion for ranking up'
+    description: '5-star food champion for ranking up',
+    utilityScore: 7,
+    utilityReasoning: 'High value - significant time saver for 6-starring champions'
   },
   {
     id: 'meal',
     name: 'Meal',
     category: ITEM_CATEGORIES.RANKING,
-    description: 'Special food item for champion ranking'
+    description: 'Special food item for champion ranking',
+    utilityScore: 6,
+    utilityReasoning: 'Useful for ranking up, depends on rarity'
   },
 
   // Ascension Potions
@@ -168,37 +193,37 @@ export const ITEM_TYPES: ItemType[] = [
   },
   {
     id: '5_star_epic_chaos_ore',
-    name: '5⭐ Epic Chaos Ore',
+    name: '5 ⭐ Epic Chaos Ore',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: '5 star epic chaos ore for gear ascension'
   },
   {
     id: '6_star_epic_chaos_ore',
-    name: '6⭐ Epic Chaos Ore',
+    name: '6 ⭐ Epic Chaos Ore',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: '6 star epic chaos ore for gear ascension'
   },
   {
     id: '5_star_legendary_chaos_ore',
-    name: '5⭐ Legendary Chaos Ore',
+    name: '5 ⭐ Legendary Chaos Ore',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: '5 star legendary chaos ore for gear ascension'
   },
   {
     id: '6_star_legendary_chaos_ore',
-    name: '6⭐ Legendary Chaos Ore',
+    name: '6 ⭐ Legendary Chaos Ore',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: '6 star legendary chaos ore for gear ascension'
   },
   {
     id: '5_star_mythical_chaos_ore',
-    name: '5⭐ Mythical Chaos Ore',
+    name: '5 ⭐ Mythical Chaos Ore',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: '5 star mythical chaos ore for gear ascension'
   },
   {
     id: '6_star_mythical_chaos_ore',
-    name: '6⭐ Mythical Chaos Ore',
+    name: '6 ⭐ Mythical Chaos Ore',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: '6 star mythical chaos ore for gear ascension'
   },
@@ -234,25 +259,33 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'ancient_shard',
     name: 'Ancient Shard',
     category: ITEM_CATEGORIES.SUMMONING,
-    description: 'Common summoning shard'
+    description: 'Common summoning shard',
+    utilityScore: 6,
+    utilityReasoning: 'Useful for champion collection and fodder'
   },
   {
     id: 'void_shard',
     name: 'Void Shard',
     category: ITEM_CATEGORIES.SUMMONING,
-    description: 'Void affinity summoning shard'
+    description: 'Void affinity summoning shard',
+    utilityScore: 7,
+    utilityReasoning: 'More valuable than ancient shards - limited void pool'
   },
   {
     id: 'primal_shard',
     name: 'Primal Shard',
     category: ITEM_CATEGORIES.SUMMONING,
-    description: 'Primal summoning shard'
+    description: 'Primal summoning shard',
+    utilityScore: 8,
+    utilityReasoning: 'High value - rare summoning opportunity'
   },
   {
     id: 'sacred_shard',
     name: 'Sacred Shard',
     category: ITEM_CATEGORIES.SUMMONING,
-    description: 'Legendary summoning shard'
+    description: 'Legendary summoning shard',
+    utilityScore: 10,
+    utilityReasoning: 'Maximum value - guaranteed epic or legendary champion'
   },
 
   // Soul Summoning
@@ -286,25 +319,33 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'rare_skill_tome',
     name: 'Rare Skill Tome',
     category: ITEM_CATEGORIES.SKILL_TOMES,
-    description: 'Skill book for rare champions'
+    description: 'Skill book for rare champions',
+    utilityScore: 6,
+    utilityReasoning: 'Useful for completing rare champions'
   },
   {
     id: 'epic_skill_tome',
     name: 'Epic Skill Tome',
     category: ITEM_CATEGORIES.SKILL_TOMES,
-    description: 'Skill book for epic champions'
+    description: 'Skill book for epic champions',
+    utilityScore: 8,
+    utilityReasoning: 'High value - essential for meta epic champions'
   },
   {
     id: 'legendary_skill_tome',
     name: 'Legendary Skill Tome',
     category: ITEM_CATEGORIES.SKILL_TOMES,
-    description: 'Skill book for legendary champions'
+    description: 'Skill book for legendary champions',
+    utilityScore: 10,
+    utilityReasoning: 'Maximum value - extremely rare and essential for legendary champions'
   },
   {
     id: 'mythical_skill_tome',
     name: 'Mythical Skill Tome',
     category: ITEM_CATEGORIES.SKILL_TOMES,
-    description: 'Skill book for mythical champions'
+    description: 'Skill book for mythical champions',
+    utilityScore: 10,
+    utilityReasoning: 'Maximum value - extremely rare for highest tier champions'
   },
 
   // Farming & Convenience
@@ -312,7 +353,9 @@ export const ITEM_TYPES: ItemType[] = [
     id: 'multi_battle_attempts',
     name: 'Multi-Battle Attempts',
     category: ITEM_CATEGORIES.FARMING,
-    description: 'Attempts for automated multi-battle farming'
+    description: 'Attempts for automated multi-battle farming',
+    utilityScore: 2,
+    utilityReasoning: 'Nearly useless - easily obtained through gameplay'
   },
   {
     id: 'demon_lord_key',
@@ -342,6 +385,20 @@ export const ITEM_TYPES: ItemType[] = [
 
 export function getItemTypeById(id: string): ItemType | undefined {
   return ITEM_TYPES.find(item => item.id === id);
+}
+
+// Get utility score for an item (defaults to 5 if not set)
+export function getUtilityScore(itemType: ItemType | undefined): number {
+  return itemType?.utilityScore ?? 5;
+}
+
+// Calculate utility-adjusted price
+export function calculateUtilityAdjustedPrice(basePrice: number, utilityScore: number): number {
+  // Utility score of 5 = no adjustment (1.0x multiplier)
+  // Utility score of 10 = 1.5x multiplier (more valuable)
+  // Utility score of 1 = 0.2x multiplier (much less valuable)
+  const multiplier = 0.2 + (utilityScore - 1) * (1.3 / 9);
+  return basePrice * multiplier;
 }
 
 export function getItemTypesByCategory(category: string): ItemType[] {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { savePriceSnapshot } from '../firebase/historical';
 import { calculateItemPrices, clearPricingCache } from '../services/pricingService';
-import { ITEM_TYPES, getItemTypeById } from '../types/itemTypes';
+import { ITEM_TYPES, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice } from '../types/itemTypes';
 import ConfidenceIndicator from './ConfidenceIndicator';
 
 interface ItemValue {
@@ -10,6 +10,8 @@ interface ItemValue {
   itemName: string;
   category: string;
   averagePrice: number;
+  utilityAdjustedPrice: number;
+  utilityScore: number;
   totalQuantity: number;
   packCount: number;
 }
@@ -21,6 +23,7 @@ export default function ItemValues() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [totalPacks, setTotalPacks] = useState<number>(0);
+  const [showUtilityAdjusted, setShowUtilityAdjusted] = useState(false);
 
   useEffect(() => {
     loadItemValues();
@@ -42,11 +45,16 @@ export default function ItemValues() {
       const values: ItemValue[] = Object.entries(itemStats).map(([itemTypeId, stats]) => {
         const itemType = getItemTypeById(itemTypeId);
         const averagePrice = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
+        const utilityScore = getUtilityScore(itemType);
+        const utilityAdjustedPrice = calculateUtilityAdjustedPrice(averagePrice, utilityScore);
+        
         return {
           itemTypeId,
           itemName: itemType?.name || 'Unknown Item',
           category: itemType?.category || 'Unknown',
           averagePrice,
+          utilityAdjustedPrice,
+          utilityScore,
           totalQuantity: stats.totalQuantity,
           packCount: stats.packCount
         };
@@ -146,6 +154,22 @@ export default function ItemValues() {
           </div>
           
           <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-sm">
+              <span className="text-secondary-600">Utility Adjusted:</span>
+              <button
+                onClick={() => setShowUtilityAdjusted(!showUtilityAdjusted)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  showUtilityAdjusted ? 'bg-primary-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showUtilityAdjusted ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -181,14 +205,46 @@ export default function ItemValues() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-secondary-800">{item.itemName}</h3>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h3 className="text-lg font-semibold text-secondary-800">{item.itemName}</h3>
+                    {item.utilityScore !== 5 && (
+                      <div className="flex items-center space-x-2 bg-white/60 px-2 py-1 rounded-lg border border-gray-200">
+                        <span className="text-xs font-medium text-gray-700">Utility:</span>
+                        <div className="flex space-x-1">
+                          {Array.from({ length: 10 }, (_, i) => (
+                            <span
+                              key={i}
+                              className={`text-sm ${
+                                i < item.utilityScore ? 'text-amber-500' : 'text-gray-300'
+                              }`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-xs font-medium text-gray-700 ml-1">({item.utilityScore}/10)</span>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-sm text-secondary-600">{item.category}</p>
                 </div>
                 
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary-600">
-                    ${(item.averagePrice && isFinite(item.averagePrice)) ? item.averagePrice.toFixed(4) : '0.0000'}
+                    ${showUtilityAdjusted 
+                      ? (item.utilityAdjustedPrice && isFinite(item.utilityAdjustedPrice)) 
+                        ? item.utilityAdjustedPrice.toFixed(4) 
+                        : '0.0000'
+                      : (item.averagePrice && isFinite(item.averagePrice)) 
+                        ? item.averagePrice.toFixed(4) 
+                        : '0.0000'
+                    }
                   </div>
+                  {showUtilityAdjusted && item.averagePrice !== item.utilityAdjustedPrice && (
+                    <div className="text-sm text-secondary-500">
+                      Market: ${(item.averagePrice && isFinite(item.averagePrice)) ? item.averagePrice.toFixed(4) : '0.0000'}
+                    </div>
+                  )}
                   <ConfidenceIndicator 
                     totalQuantity={item.totalQuantity}
                     packCount={item.packCount}
