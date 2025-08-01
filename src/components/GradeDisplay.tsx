@@ -21,11 +21,25 @@ export default function GradeDisplay({ grade }: GradeDisplayProps) {
           className: 'grade-s',
           icon: '🏆'
         };
+      case 'A+':
+        return {
+          label: 'A+ - Exceptional Value',
+          description: 'Outstanding deal! This pack offers exceptional value for money.',
+          className: 'grade-a',
+          icon: '🏆'
+        };
       case 'A':
         return {
-          label: 'A - Great Value',
+          label: 'A - Excellent Value',
           description: 'Excellent choice! This pack provides great value for money.',
           className: 'grade-a',
+          icon: '⭐'
+        };
+      case 'B+':
+        return {
+          label: 'B+ - Very Good Value',
+          description: 'Very good option! This pack offers solid value.',
+          className: 'grade-b',
           icon: '⭐'
         };
       case 'B':
@@ -34,6 +48,13 @@ export default function GradeDisplay({ grade }: GradeDisplayProps) {
           description: 'Solid option. This pack offers decent value.',
           className: 'grade-b',
           icon: '👍'
+        };
+      case 'C+':
+        return {
+          label: 'C+ - Fair Value',
+          description: 'Fair deal. Could be worth considering.',
+          className: 'grade-c',
+          icon: '👌'
         };
       case 'C':
         return {

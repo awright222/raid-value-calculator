@@ -6,6 +6,7 @@ import GradeDisplay from './GradeDisplay';
 
 interface PackWithValue {
   id: string;
+  name: string;
   price: number;
   items: Array<{ itemTypeId: string; quantity: number }>;
   totalValue: number;
@@ -135,23 +136,24 @@ export default function BestDeals() {
         // Only include packs with positive savings (better than average)
         if (savings > 0 && savingsPercentage > 5) { // At least 5% better than average
           // Simple grading based on savings percentage
-          let grade = 'F';
-          if (savingsPercentage >= 50) grade = 'A+';
-          else if (savingsPercentage >= 40) grade = 'A';
-          else if (savingsPercentage >= 30) grade = 'B+';
-          else if (savingsPercentage >= 20) grade = 'B';
-          else if (savingsPercentage >= 10) grade = 'C+';
-          else if (savingsPercentage >= 5) grade = 'C';
-          else grade = 'D';
+          let calculatedGrade = 'F';
+          if (savingsPercentage >= 50) calculatedGrade = 'A+';
+          else if (savingsPercentage >= 40) calculatedGrade = 'A';
+          else if (savingsPercentage >= 30) calculatedGrade = 'B+';
+          else if (savingsPercentage >= 20) calculatedGrade = 'B';
+          else if (savingsPercentage >= 10) calculatedGrade = 'C+';
+          else if (savingsPercentage >= 5) calculatedGrade = 'C';
+          else calculatedGrade = 'D';
 
           packsWithValue.push({
             id: pack.id || '',
+            name: pack.name || pack.display_name || 'Unknown Pack',
             price: pack.price,
             items: pack.items,
             totalValue: totalMarketValue,
             savings,
             savingsPercentage,
-            grade,
+            grade: calculatedGrade, // Use our calculated grade
             createdAt: pack.created_at
           });
         }
@@ -176,7 +178,7 @@ export default function BestDeals() {
       default:
         return b.savingsPercentage - a.savingsPercentage;
     }
-  });
+  }).slice(0, 3); // Limit to top 3 deals
 
   if (loading) {
     return (
@@ -189,11 +191,11 @@ export default function BestDeals() {
 
   if (bestPacks.length === 0) {
     return (
-      <div className="glass-effect rounded-3xl p-8 text-center">
-        <div className="text-6xl mb-4">🏆</div>
-        <h3 className="text-xl font-semibold text-secondary-800 mb-2">No Deals Yet</h3>
+            <div className="glass-effect rounded-3xl p-8 text-center">
+        <div className="text-6xl mb-4">�</div>
+        <h3 className="text-xl font-semibold text-secondary-800 mb-2">No Great Deals Yet</h3>
         <p className="text-secondary-600 mb-6">
-          Add some packs in the Admin panel to see the best value deals!
+          Submit some packs to find the best deals worth buying!
         </p>
       </div>
     );
@@ -208,8 +210,8 @@ export default function BestDeals() {
       <div className="glass-effect rounded-3xl p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-secondary-800 mb-2">🏆 Best Deals</h2>
-            <p className="text-secondary-600">Top value packs worth buying</p>
+            <h2 className="text-2xl font-bold text-secondary-800 mb-2">� Deal Spotlight</h2>
+            <p className="text-secondary-600">Top 3 packs worth buying - with full details</p>
           </div>
           
           <select
@@ -235,13 +237,13 @@ export default function BestDeals() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <GradeDisplay grade={pack.grade} />
+                    <GradeDisplay grade={pack.savingsPercentage >= 70 ? 'A+' : pack.grade} />
                     <div>
                       <h3 className="text-lg font-semibold text-secondary-800">
-                        ${pack.price ? pack.price.toFixed(2) : '0.00'} Pack
+                        {pack.name}
                       </h3>
                       <p className="text-sm text-green-600 font-medium">
-                        Save ${pack.savings ? pack.savings.toFixed(2) : '0.00'} ({pack.savingsPercentage ? pack.savingsPercentage.toFixed(1) : '0'}% off)
+                        ${pack.price ? pack.price.toFixed(2) : '0.00'} - Save ${pack.savings ? pack.savings.toFixed(2) : '0.00'} ({pack.savingsPercentage ? pack.savingsPercentage.toFixed(1) : '0'}% off)
                       </p>
                     </div>
                   </div>
@@ -258,6 +260,10 @@ export default function BestDeals() {
                       );
                     })}
                   </div>
+                  
+                  <div className="text-xs text-secondary-500">
+                    Last seen: {pack.createdAt?.toDate?.()?.toLocaleDateString() || 'Unknown'}
+                  </div>
                 </div>
                 
                 <div className="text-right">
@@ -270,11 +276,23 @@ export default function BestDeals() {
               
               <div className="mt-4 bg-green-100 rounded-lg p-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-green-800 font-medium">Excellent Value!</span>
+                  <span className="text-green-800 font-medium">
+                    {pack.grade === 'A+' ? 'Exceptional Value!' :
+                     pack.grade === 'A' ? 'Excellent Value!' :
+                     pack.grade === 'B+' ? 'Very Good Value!' :
+                     pack.grade === 'B' ? 'Good Value!' :
+                     pack.grade === 'C+' ? 'Fair Value' :
+                     pack.grade === 'C' ? 'Decent Value' :
+                     'Below Average Value'}
+                  </span>
                   <span className="text-green-600">
-                    {pack.savingsPercentage >= 50 ? '🔥 Amazing Deal' : 
-                     pack.savingsPercentage >= 30 ? '⭐ Great Deal' : 
-                     '👍 Good Deal'}
+                    {pack.grade === 'A+' ? '🔥 Amazing Deal' :
+                     pack.grade === 'A' ? '🔥 Amazing Deal' :
+                     pack.grade === 'B+' ? '⭐ Great Deal' :
+                     pack.grade === 'B' ? '⭐ Great Deal' :
+                     pack.grade === 'C+' ? '👍 Good Deal' :
+                     pack.grade === 'C' ? '👍 Decent Deal' :
+                     '⚠️ Fair Deal'}
                   </span>
                 </div>
               </div>

@@ -127,7 +127,7 @@ export const ITEM_TYPES: ItemType[] = [
   },
   {
     id: 'meal',
-    name: 'Meal',
+    name: 'Feast',
     category: ITEM_CATEGORIES.RANKING,
     description: 'Special food item for champion ranking',
     utilityScore: 6,
