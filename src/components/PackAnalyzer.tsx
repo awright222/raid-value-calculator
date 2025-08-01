@@ -48,6 +48,30 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   
   const analytics = useAnalytics();
 
+  // Smart price display for very small values
+  const formatSmartPrice = (price: number, itemId?: string): string => {
+    if (!price || !isFinite(price)) return '$0.000 each';
+    
+    // For very small values, show per meaningful unit
+    if (price < 0.001 && price > 0) {
+      switch (itemId) {
+        case 'silver':
+          return `$${(price * 1000).toFixed(3)} per 1K`;
+        case 'xp_brew':
+        case 'xp_barrel':
+          return `$${(price * 10).toFixed(3)} per 10`;
+        default:
+          if (price < 0.0001) {
+            return `$${(price * 10000).toFixed(3)} per 10K`;
+          } else {
+            return `$${(price * 100).toFixed(3)} per 100`;
+          }
+      }
+    }
+    
+    return `$${price.toFixed(3)} each`;
+  };
+
   useEffect(() => {
     loadItemPrices();
   }, []);
@@ -730,13 +754,13 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                                         <div>
                                           <span className="text-secondary-500 dark:text-gray-400">Your Cost:</span>
                                           <div className="font-semibold text-secondary-700 dark:text-gray-200">
-                                            ${(item.costPerUnit && isFinite(item.costPerUnit)) ? item.costPerUnit.toFixed(3) : '0.000'} each
+                                            {formatSmartPrice(item.costPerUnit, item.itemType.id)}
                                           </div>
                                         </div>
                                         <div>
                                           <span className="text-secondary-500 dark:text-gray-400">Market Price:</span>
                                           <div className="font-semibold text-secondary-700 dark:text-gray-200">
-                                            ${(item.marketPricePerUnit && isFinite(item.marketPricePerUnit)) ? item.marketPricePerUnit.toFixed(3) : '0.000'} each
+                                            {formatSmartPrice(item.marketPricePerUnit, item.itemType.id)}
                                           </div>
                                         </div>
                                       </div>
