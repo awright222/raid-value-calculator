@@ -88,6 +88,38 @@ export const PersonalRankings: React.FC<PersonalRankingsProps> = ({ isOpen, onCl
             </div>
           </div>
 
+          {/* Info Section */}
+          <div className="border-b border-gray-200 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-blue-600 text-sm font-bold">?</span>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-blue-900 mb-2">How to Use Utility Adjustments</h4>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <p><strong>Rating 5 = Market Value</strong> - You value this item exactly at its market price</p>
+                  <p><strong>Higher than 5</strong> - You value this item MORE than the market (great for your gameplay style)</p>
+                  <p><strong>Lower than 5</strong> - You value this item LESS than the market (not useful for your goals)</p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded">1-2: Avoid</span>
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">3-4: Low Priority</span>
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded">5: Market Value</span>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">6-8: High Priority</span>
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">9-10: Essential</span>
+                </div>
+                <div className="mt-3 p-3 bg-blue-100 rounded-lg">
+                  <p className="text-xs text-blue-800 font-medium mb-1">💡 Example:</p>
+                  <p className="text-xs text-blue-700">
+                    If you're pushing Campaign, rate Ancient Shards as 8-9 (you need champions). 
+                    If you're farming dungeons, rate Energy as 9-10 and Silver as 8-9 (you need resources).
+                    Rate items you never use as 1-3 to see better pack values.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
             <div className="space-y-6">
