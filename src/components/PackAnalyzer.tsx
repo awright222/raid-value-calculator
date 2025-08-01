@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import GradeDisplay from './GradeDisplay';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import RateLimitInfo from './RateLimitInfo';
-import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
+import { PersonalRankings } from './PersonalRankings';
+import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice, type PackItem } from '../types/itemTypes';
 import { savePackAnalysis } from '../firebase/historical';
 import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
 import { useAnalytics } from '../services/analytics';
@@ -42,6 +43,8 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [isSubmittingToDatabase, setIsSubmittingToDatabase] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
   const [showAddPackModal, setShowAddPackModal] = useState(false);
+  const [useUtilityAdjustment, setUseUtilityAdjustment] = useState(false);
+  const [showPersonalRankings, setShowPersonalRankings] = useState(false);
   
   const analytics = useAnalytics();
 
@@ -123,7 +126,14 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
 
     packItems.forEach(item => {
       const itemType = getItemTypeById(item.itemTypeId);
-      const marketPricePerUnit = itemPrices[item.itemTypeId] || 0;
+      let marketPricePerUnit = itemPrices[item.itemTypeId] || 0;
+      
+      // Apply utility adjustment if enabled
+      if (useUtilityAdjustment && itemType) {
+        const utilityScore = getUtilityScore(itemType, useUtilityAdjustment);
+        marketPricePerUnit = calculateUtilityAdjustedPrice(marketPricePerUnit, utilityScore);
+      }
+      
       const itemMarketValue = item.quantity * marketPricePerUnit;
       
       totalMarketValue += itemMarketValue;
@@ -408,17 +418,39 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
             </p>
           </div>
           
-          <button
-            onClick={handleRefreshData}
-            disabled={refreshing}
-            className="text-sm text-secondary-600 hover:text-primary-600 transition-colors flex items-center space-x-1"
-            title="Refresh market data"
-          >
-            <span className={`text-lg ${refreshing ? 'animate-spin' : ''}`}>🔄</span>
-            <span className="text-xs">
-              {refreshing ? 'Updating...' : `Data: ${lastDataUpdate.toLocaleTimeString()}`}
-            </span>
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Utility Adjustment Toggle */}
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useUtilityAdjustment}
+                  onChange={(e) => setUseUtilityAdjustment(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+                />
+                <span>⚖️ Utility Adjustments</span>
+              </label>
+              <button
+                onClick={() => setShowPersonalRankings(true)}
+                className="text-xs text-primary-600 hover:text-primary-700 underline"
+                title="Customize how much you value each item type"
+              >
+                Customize
+              </button>
+            </div>
+            
+            <button
+              onClick={handleRefreshData}
+              disabled={refreshing}
+              className="text-sm text-secondary-600 hover:text-primary-600 transition-colors flex items-center space-x-1"
+              title="Refresh market data"
+            >
+              <span className={`text-lg ${refreshing ? 'animate-spin' : ''}`}>🔄</span>
+              <span className="text-xs">
+                {refreshing ? 'Updating...' : `Data: ${lastDataUpdate.toLocaleTimeString()}`}
+              </span>
+            </button>
+          </div>
         </div>
         
         <div className="grid lg:grid-cols-2 gap-12">
@@ -868,6 +900,12 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
           </motion.div>
         </div>
       )}
+
+      {/* Personal Rankings Modal */}
+      <PersonalRankings
+        isOpen={showPersonalRankings}
+        onClose={() => setShowPersonalRankings(false)}
+      />
     </div>
   );
 }

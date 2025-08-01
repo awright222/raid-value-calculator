@@ -387,8 +387,24 @@ export function getItemTypeById(id: string): ItemType | undefined {
 }
 
 // Get utility score for an item (defaults to 5 if not set)
-export function getUtilityScore(itemType: ItemType | undefined): number {
-  return itemType?.utilityScore ?? 5;
+export function getUtilityScore(itemType: ItemType | undefined, usePersonalized: boolean = false): number {
+  if (!itemType) return 5;
+  
+  if (usePersonalized && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('raid_value_calc_user_utility_prefs');
+      if (stored) {
+        const prefs = JSON.parse(stored);
+        if (prefs[itemType.id] !== undefined) {
+          return prefs[itemType.id];
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load user utility preferences:', error);
+    }
+  }
+  
+  return itemType.utilityScore ?? 5;
 }
 
 // Calculate utility-adjusted price

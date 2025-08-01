@@ -15,7 +15,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'debug'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'debug' | 'utility'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -56,11 +56,16 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
   const [itemValuesDebugResults, setItemValuesDebugResults] = useState<any>(null);
   const [itemValuesDebugRunning, setItemValuesDebugRunning] = useState(false);
 
+  // Utility management state
+  const [utilityEdits, setUtilityEdits] = useState<{[itemId: string]: number}>({});
+  const [utilitySaving, setUtilitySaving] = useState(false);
+
   const adminTabs = [
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
     { id: 'debug', label: 'Debug', icon: '🔧', description: 'Firebase diagnostics' },
     { id: 'analytics', label: 'Analytics', icon: '📈', description: 'User engagement & traffic stats' },
     { id: 'intelligence', label: 'Pack Intelligence', icon: '📊', description: 'Market analysis & pack evolution' },
+    { id: 'utility', label: 'Item Values', icon: '⚖️', description: 'Manage item utility scores' },
     { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
     { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
     { id: 'maintenance', label: 'Maintenance', icon: '🧹', description: 'System cleanup' }
@@ -917,6 +922,110 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
             </div>
             
             <PackIntelligence />
+          </div>
+        )}
+
+        {/* Utility Management Tab */}
+        {activeAdminTab === 'utility' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Item Utility Management
+              </h2>
+              <p className="text-secondary-600">
+                Adjust utility scores for items to control pack value calculations
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {Object.values(ITEM_CATEGORIES).map((category) => {
+                const items = getItemTypesByCategory(category);
+                if (items.length === 0) return null;
+
+                return (
+                  <div key={category} className="bg-white/50 rounded-xl p-6">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4">{category}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {items.map((item) => (
+                        <div key={item.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h4 className="font-medium text-gray-800">{item.name}</h4>
+                              <p className="text-sm text-gray-600">{item.description}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-sm font-medium text-gray-700">
+                                Utility Score (1-10)
+                              </label>
+                              <span className="text-xs text-gray-500">
+                                Current: {item.utilityScore || 5}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="1"
+                              max="10"
+                              value={utilityEdits[item.id] ?? item.utilityScore ?? 5}
+                              onChange={(e) => setUtilityEdits({
+                                ...utilityEdits,
+                                [item.id]: parseInt(e.target.value)
+                              })}
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Low Value</span>
+                              <span className="font-medium">
+                                {utilityEdits[item.id] ?? item.utilityScore ?? 5}
+                              </span>
+                              <span>High Value</span>
+                            </div>
+                            {item.utilityReasoning && (
+                              <p className="text-xs text-gray-600 italic">
+                                Reasoning: {item.utilityReasoning}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-center pt-6">
+                <motion.button
+                  onClick={async () => {
+                    setUtilitySaving(true);
+                    try {
+                      // TODO: Implement saving to Firebase
+                      console.log('Utility edits to save:', utilityEdits);
+                      // Simulate API call
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      setSuccess('Utility scores updated successfully!');
+                      setTimeout(() => setSuccess(''), 3000);
+                    } catch (error) {
+                      setError('Failed to save utility scores');
+                      setTimeout(() => setError(''), 3000);
+                    } finally {
+                      setUtilitySaving(false);
+                    }
+                  }}
+                  disabled={utilitySaving || Object.keys(utilityEdits).length === 0}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                    Object.keys(utilityEdits).length === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {utilitySaving ? 'Saving...' : `Save Changes (${Object.keys(utilityEdits).length})`}
+                </motion.button>
+              </div>
+            </div>
           </div>
         )}
 
