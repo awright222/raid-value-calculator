@@ -102,19 +102,11 @@ export const PersonalRankings: React.FC<PersonalRankingsProps> = ({ isOpen, onCl
                   <p><strong>Lower than 5</strong> - You value this item LESS than the market (not useful for your goals)</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded">1-2: Avoid</span>
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">3-4: Low Priority</span>
+                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded">1-2: Essentially Worthless</span>
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">3-4: Low Value</span>
                   <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded">5: Market Value</span>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">6-8: High Priority</span>
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">9-10: Essential</span>
-                </div>
-                <div className="mt-3 p-3 bg-blue-100 rounded-lg">
-                  <p className="text-xs text-blue-800 font-medium mb-1">💡 Example:</p>
-                  <p className="text-xs text-blue-700">
-                    If you're pushing Campaign, rate Ancient Shards as 8-9 (you need champions). 
-                    If you're farming dungeons, rate Energy as 9-10 and Silver as 8-9 (you need resources).
-                    Rate items you never use as 1-3 to see better pack values.
-                  </p>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">6-8: High Value</span>
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">9-10: Extremely Valuable</span>
                 </div>
               </div>
             </div>
