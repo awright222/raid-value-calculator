@@ -58,8 +58,31 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
     }
 
     console.log('🔄 Calculating fresh pricing data...');
-    const packs = await getAllPacks();
-    console.log('Pricing Algorithm: Loading data from', packs.length, 'packs');
+    
+    // Add timeout and retry logic for getAllPacks
+    let packs: any[] = [];
+    try {
+      packs = await getAllPacks();
+      console.log('✅ Successfully loaded', packs.length, 'packs from Firebase');
+    } catch (error) {
+      console.error('❌ Failed to load packs from Firebase:', error);
+      
+      // Return cached data if available, even if expired
+      if (pricingCache) {
+        console.log('🔄 Using expired cache due to Firebase error');
+        return pricingCache;
+      }
+      
+      // If no cache available, return empty result
+      console.log('⚠️ No cache available, returning empty pricing data');
+      return {
+        itemPrices: {},
+        itemStats: {},
+        totalPacks: 0
+      };
+    }
+    
+    console.log('Pricing Algorithm: Processing data from', packs.length, 'packs');
   
   // Filter packs that have items data and valid prices (include ALL items, not just energy items)
   const packsWithItems = packs.filter(pack => pack.items && pack.items.length > 0 && pack.price && pack.price > 0);
@@ -135,7 +158,7 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
       let knownItems: Array<{ itemTypeId: string; quantity: number; price: number }> = [];
       let unknownItems: Array<{ itemTypeId: string; quantity: number }> = [];
 
-      pack.items.forEach(item => {
+      pack.items.forEach((item: any) => {
         if (currentPrices[item.itemTypeId] !== undefined) {
           const itemValue = currentPrices[item.itemTypeId] * item.quantity;
           knownValue += itemValue;

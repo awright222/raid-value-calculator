@@ -2,7 +2,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
-
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBdwybw1EHUs2ORUtijXd_-XDiwH6SJTN0",
@@ -17,7 +16,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase services
-export const db = getFirestore(app);
+// Initialize Firestore with explicit settings to avoid compatibility issues
+const db = getFirestore(app);
 
+export { db };
 export default app;

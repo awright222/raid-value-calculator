@@ -55,24 +55,26 @@ export default function ItemValues() {
       setItemValues(values);
       setLastUpdated(new Date());
       
-      // Save historical price snapshot
-      try {
-        const priceData: Record<string, { price: number; packCount: number; totalQuantity: number; itemName: string }> = {};
-        Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
-          const itemType = getItemTypeById(itemTypeId);
-          const price = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
-          priceData[itemTypeId] = {
-            price,
-            packCount: stats.packCount,
-            totalQuantity: stats.totalQuantity,
-            itemName: itemType?.name || 'Unknown Item'
-          };
-        });
-        
-        await savePriceSnapshot(priceData);
-        // Historical price snapshot saved
-      } catch (error) {
-        // Failed to save price snapshot silently
+      // Save historical price snapshot - only on manual refresh to avoid automatic writes
+      if (isRefresh) {
+        try {
+          const priceData: Record<string, { price: number; packCount: number; totalQuantity: number; itemName: string }> = {};
+          Object.entries(itemStats).forEach(([itemTypeId, stats]) => {
+            const itemType = getItemTypeById(itemTypeId);
+            const price = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
+            priceData[itemTypeId] = {
+              price,
+              packCount: stats.packCount,
+              totalQuantity: stats.totalQuantity,
+              itemName: itemType?.name || 'Unknown Item'
+            };
+          });
+          
+          await savePriceSnapshot(priceData);
+          console.log('Historical price snapshot saved');
+        } catch (error) {
+          console.warn('Failed to save price snapshot:', error);
+        }
       }
     } catch (error) {
       // Failed to load item values - using fallback

@@ -159,31 +159,46 @@ export interface PackMarketIntelligence {
 // Save item price snapshots for historical tracking
 export const savePriceSnapshot = async (itemPrices: Record<string, { price: number; packCount: number; totalQuantity: number; itemName: string }>): Promise<void> => {
   try {
-    const batch = [];
     const timestamp = Timestamp.now();
     
-    for (const [itemTypeId, data] of Object.entries(itemPrices)) {
-      // Calculate confidence score (0-100)
-      const confidence = Math.min(100, Math.max(0, 
-        (data.packCount * 10) + // 10 points per pack
-        (Math.min(data.totalQuantity, 100) * 0.5) // 0.5 points per quantity, capped at 50
-      ));
+    // Limit batch size to prevent overwhelming Firebase
+    const maxBatchSize = 10;
+    const items = Object.entries(itemPrices);
+    
+    for (let i = 0; i < items.length; i += maxBatchSize) {
+      const batchItems = items.slice(i, i + maxBatchSize);
+      const batchPromises = [];
       
-      const snapshot: PriceSnapshot = {
-        itemTypeId,
-        itemName: data.itemName,
-        price: data.price,
-        confidence,
-        packCount: data.packCount,
-        totalQuantity: data.totalQuantity,
-        timestamp,
-        created_at: timestamp
-      };
+      for (const [itemTypeId, data] of batchItems) {
+        // Calculate confidence score (0-100)
+        const confidence = Math.min(100, Math.max(0, 
+          (data.packCount * 10) + // 10 points per pack
+          (Math.min(data.totalQuantity, 100) * 0.5) // 0.5 points per quantity, capped at 50
+        ));
+        
+        const snapshot: PriceSnapshot = {
+          itemTypeId,
+          itemName: data.itemName,
+          price: data.price,
+          confidence,
+          packCount: data.packCount,
+          totalQuantity: data.totalQuantity,
+          timestamp,
+          created_at: timestamp
+        };
+        
+        batchPromises.push(addDoc(collection(db, 'price_history'), snapshot));
+      }
       
-      batch.push(addDoc(collection(db, 'price_history'), snapshot));
+      // Execute batch with delay between batches
+      await Promise.all(batchPromises);
+      
+      // Small delay between batches to avoid overwhelming Firebase
+      if (i + maxBatchSize < items.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
     
-    await Promise.all(batch);
     console.log(`Saved price snapshot for ${Object.keys(itemPrices).length} items`);
   } catch (error) {
     console.error('Error saving price snapshot:', error);

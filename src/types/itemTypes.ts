@@ -86,19 +86,19 @@ export const ITEM_TYPES: ItemType[] = [
   // Ranking Up
   {
     id: 'chicken_3star',
-    name: '3 Star Chicken',
+    name: '3⭐ Chicken',
     category: ITEM_CATEGORIES.RANKING,
     description: '3-star food champion for ranking up'
   },
   {
     id: 'chicken_4star',
-    name: '4 Star Chicken',
+    name: '4⭐ Chicken',
     category: ITEM_CATEGORIES.RANKING,
     description: '4-star food champion for ranking up'
   },
   {
     id: 'chicken_5star',
-    name: '5 Star Chicken',
+    name: '5⭐ Chicken',
     category: ITEM_CATEGORIES.RANKING,
     description: '5-star food champion for ranking up'
   },
@@ -165,6 +165,42 @@ export const ITEM_TYPES: ItemType[] = [
     name: 'Chaos Dust',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: 'Chaos dust for gear ascension'
+  },
+  {
+    id: '5_star_epic_chaos_ore',
+    name: '5⭐ Epic Chaos Ore',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: '5 star epic chaos ore for gear ascension'
+  },
+  {
+    id: '6_star_epic_chaos_ore',
+    name: '6⭐ Epic Chaos Ore',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: '6 star epic chaos ore for gear ascension'
+  },
+  {
+    id: '5_star_legendary_chaos_ore',
+    name: '5⭐ Legendary Chaos Ore',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: '5 star legendary chaos ore for gear ascension'
+  },
+  {
+    id: '6_star_legendary_chaos_ore',
+    name: '6⭐ Legendary Chaos Ore',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: '6 star legendary chaos ore for gear ascension'
+  },
+  {
+    id: '5_star_mythical_chaos_ore',
+    name: '5⭐ Mythical Chaos Ore',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: '5 star mythical chaos ore for gear ascension'
+  },
+  {
+    id: '6_star_mythical_chaos_ore',
+    name: '6⭐ Mythical Chaos Ore',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: '6 star mythical chaos ore for gear ascension'
   },
 
   // Accessory Ascension Items

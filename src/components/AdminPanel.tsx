@@ -4,6 +4,8 @@ import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem
 import { addPack } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
 import { testFirebaseConnection } from '../firebase/connectionTest';
+import { createFirebaseDebugger } from '../utils/firebaseDebugger';
+import { diagnosePricingServiceIssue } from '../utils/itemValuesDiagnostic';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import type { PendingPack } from '../utils/duplicateDetection';
@@ -13,7 +15,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'debug'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -48,13 +50,20 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     result: null
   });
 
+  // Debug state
+  const [debugResults, setDebugResults] = useState<any>(null);
+  const [debugRunning, setDebugRunning] = useState(false);
+  const [itemValuesDebugResults, setItemValuesDebugResults] = useState<any>(null);
+  const [itemValuesDebugRunning, setItemValuesDebugRunning] = useState(false);
+
   const adminTabs = [
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
+    { id: 'debug', label: 'Debug', icon: '🔧', description: 'Firebase diagnostics' },
     { id: 'analytics', label: 'Analytics', icon: '📈', description: 'User engagement & traffic stats' },
     { id: 'intelligence', label: 'Pack Intelligence', icon: '📊', description: 'Market analysis & pack evolution' },
     { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
     { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
-    { id: 'maintenance', label: 'Maintenance', icon: '🔧', description: 'System cleanup' }
+    { id: 'maintenance', label: 'Maintenance', icon: '🧹', description: 'System cleanup' }
   ] as const;
 
   // Load pending packs for moderation
@@ -343,6 +352,100 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     } catch (error) {
       setConnectionTest({ testing: false, result: { success: false, error } });
       setError(`❌ Connection test error: ${error}`);
+    }
+  };
+
+  // Debug functions
+  const handleFullDiagnostic = async () => {
+    setDebugRunning(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const firebaseDebugger = createFirebaseDebugger();
+      const results = await firebaseDebugger.runFullDiagnostic();
+      console.log('🔍 Full diagnostic results:', results);
+      
+      // Ensure results are safe to render
+      const safeResults = {
+        summary: {
+          totalTests: Number(results.summary.totalTests) || 0,
+          passed: Number(results.summary.passed) || 0,
+          failed: Number(results.summary.failed) || 0,
+          criticalFailures: Array.isArray(results.summary.criticalFailures) ? results.summary.criticalFailures : []
+        },
+        results: Array.isArray(results.results) ? results.results.map((result: any) => ({
+          operation: String(result.operation),
+          success: Boolean(result.success),
+          error: result.error || null,
+          details: result.details ? JSON.parse(JSON.stringify(result.details)) : null,
+          timestamp: result.timestamp || new Date()
+        })) : [],
+        recommendations: Array.isArray(results.recommendations) ? results.recommendations : []
+      };
+      
+      setDebugResults(safeResults);
+      
+      if (safeResults.summary.failed > 0) {
+        setError(`Diagnostic completed: ${safeResults.summary.failed}/${safeResults.summary.totalTests} tests failed. Check details below.`);
+      } else {
+        setSuccess(`✅ All diagnostic tests passed (${safeResults.summary.passed}/${safeResults.summary.totalTests})`);
+      }
+    } catch (error) {
+      console.error('❌ Full diagnostic failed:', error);
+      setError(`Diagnostic failed: ${error}`);
+      setDebugResults(null);
+    } finally {
+      setDebugRunning(false);
+    }
+  };
+
+  const handleItemValuesDebug = async () => {
+    setItemValuesDebugRunning(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      console.log('🔍 Starting Item Values diagnostic...');
+      const results = await diagnosePricingServiceIssue();
+      console.log('🔍 Diagnostic results:', results);
+      
+      // Ensure results are serializable before setting state
+      const safeResults = {
+        success: Boolean(results.success),
+        details: {
+          getAllPacksResult: {
+            success: Boolean(results.details.getAllPacksResult.success),
+            packsCount: Number(results.details.getAllPacksResult.packsCount) || 0,
+            error: results.details.getAllPacksResult.error || null,
+            samplePack: results.details.getAllPacksResult.samplePack || null
+          },
+          pricingServiceResult: {
+            success: Boolean(results.details.pricingServiceResult.success),
+            itemCount: Number(results.details.pricingServiceResult.itemCount) || 0,
+            error: results.details.pricingServiceResult.error || null,
+            sampleItem: results.details.pricingServiceResult.sampleItem ? {
+              itemId: String(results.details.pricingServiceResult.sampleItem.itemId),
+              price: Number(results.details.pricingServiceResult.sampleItem.price) || 0
+            } : null
+          }
+        },
+        recommendations: Array.isArray(results.recommendations) ? results.recommendations : []
+      };
+      
+      setItemValuesDebugResults(safeResults);
+      
+      if (safeResults.success) {
+        setSuccess('✅ Item Values functionality is working correctly');
+      } else {
+        setError('❌ Item Values functionality has issues - check details below');
+      }
+    } catch (error) {
+      console.error('❌ Item Values diagnostic failed:', error);
+      setError(`Item Values diagnostic failed: ${error}`);
+      setItemValuesDebugResults(null);
+    } finally {
+      setItemValuesDebugRunning(false);
     }
   };
 
@@ -916,6 +1019,285 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Debug Tab */}
+        {activeAdminTab === 'debug' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Firebase Debug Diagnostics
+              </h2>
+              <p className="text-secondary-600">
+                Comprehensive Firebase connection and query testing to identify 400 errors
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Quick Actions */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <span className="mr-2">🚀</span>
+                  Quick Diagnostics
+                </h3>
+                
+                <div className="space-y-4">
+                  <button
+                    onClick={handleFullDiagnostic}
+                    disabled={debugRunning}
+                    className={`w-full py-3 rounded-lg font-medium transition-all ${
+                      debugRunning
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-primary-600 text-white hover:bg-primary-700'
+                    }`}
+                  >
+                    {debugRunning ? 'Running Diagnostics...' : 'Run Full Firebase Diagnostic'}
+                  </button>
+
+                  <button
+                    onClick={handleItemValuesDebug}
+                    disabled={itemValuesDebugRunning}
+                    className={`w-full py-3 rounded-lg font-medium transition-all ${
+                      itemValuesDebugRunning
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                  >
+                    {itemValuesDebugRunning ? 'Testing Item Values...' : 'Debug Item Values 400 Error'}
+                  </button>
+
+                  <p className="text-xs text-secondary-500">
+                    Tests connection, read/write permissions, query patterns, and indexes
+                  </p>
+                </div>
+              </div>
+
+              {/* Browser Console Info */}
+              <div className="bg-yellow-50 rounded-xl p-6 border border-yellow-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center text-yellow-800">
+                  <span className="mr-2">💡</span>
+                  Debug Instructions
+                </h3>
+                
+                <div className="space-y-3 text-sm text-yellow-700">
+                  <p>
+                    <strong>To see detailed Firebase logs:</strong>
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Open Developer Tools (F12)</li>
+                    <li>Go to Console tab</li>
+                    <li>Look for 🔥 Firebase Database logs</li>
+                    <li>Check for red error messages</li>
+                  </ol>
+                  <p className="text-xs mt-3">
+                    The diagnostic will show detailed Firebase operation results both here and in the console.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Item Values Diagnostic Results */}
+            {itemValuesDebugResults && (
+              <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+                <h3 className="text-lg font-semibold mb-6 flex items-center">
+                  <span className="mr-2">🎯</span>
+                  Item Values Diagnostic Results
+                </h3>
+
+                {/* Overall Status */}
+                <div className={`p-4 rounded-lg mb-6 ${
+                  itemValuesDebugResults.success 
+                    ? 'bg-green-50 border border-green-200' 
+                    : 'bg-red-50 border border-red-200'
+                }`}>
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${
+                      itemValuesDebugResults.success ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {itemValuesDebugResults.success ? '✅ Working' : '❌ Issues Found'}
+                    </div>
+                    <div className="text-sm mt-1">Item Values Tab Status</div>
+                  </div>
+                </div>
+
+                {/* Test Results */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* getAllPacks Result */}
+                  <div className={`p-4 rounded-lg border ${
+                    itemValuesDebugResults.details.getAllPacksResult.success
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <h4 className="font-semibold mb-2">
+                      {itemValuesDebugResults.details.getAllPacksResult.success ? '✅' : '❌'} 
+                      getAllPacks() Test
+                    </h4>
+                    <div className="text-sm space-y-1">
+                      <div>Packs Found: <strong>{itemValuesDebugResults.details.getAllPacksResult.packsCount}</strong></div>
+                      
+                      {itemValuesDebugResults.details.getAllPacksResult.samplePack && (
+                        <div className="text-xs text-gray-600 mt-2">
+                          Sample Pack: {itemValuesDebugResults.details.getAllPacksResult.samplePack.name} 
+                          (${itemValuesDebugResults.details.getAllPacksResult.samplePack.price})
+                        </div>
+                      )}
+                      
+                      {itemValuesDebugResults.details.getAllPacksResult.error && (
+                        <div className="text-xs text-red-600 mt-2">
+                          <strong>Error:</strong> {itemValuesDebugResults.details.getAllPacksResult.error.code} - 
+                          {itemValuesDebugResults.details.getAllPacksResult.error.message}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pricing Service Result */}
+                  <div className={`p-4 rounded-lg border ${
+                    itemValuesDebugResults.details.pricingServiceResult.success
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <h4 className="font-semibold mb-2">
+                      {itemValuesDebugResults.details.pricingServiceResult.success ? '✅' : '❌'} 
+                      Pricing Service Test
+                    </h4>
+                    <div className="text-sm space-y-1">
+                      <div>Items Priced: <strong>{itemValuesDebugResults.details.pricingServiceResult.itemCount}</strong></div>
+                      
+                      {itemValuesDebugResults.details.pricingServiceResult.sampleItem && (
+                        <div className="text-xs text-gray-600 mt-2">
+                          Sample: {itemValuesDebugResults.details.pricingServiceResult.sampleItem.itemId} = 
+                          ${typeof itemValuesDebugResults.details.pricingServiceResult.sampleItem.price === 'number' 
+                            ? itemValuesDebugResults.details.pricingServiceResult.sampleItem.price.toFixed(4)
+                            : 'N/A'}
+                        </div>
+                      )}
+                      
+                      {itemValuesDebugResults.details.pricingServiceResult.error && (
+                        <div className="text-xs text-red-600 mt-2">
+                          <strong>Error:</strong> {itemValuesDebugResults.details.pricingServiceResult.error.code} - 
+                          {itemValuesDebugResults.details.pricingServiceResult.error.message}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recommendations */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 mb-2">💡 Recommendations:</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    {itemValuesDebugResults.recommendations.map((rec: string, index: number) => (
+                      <li key={index} className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Diagnostic Results */}
+            {debugResults && (
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h3 className="text-lg font-semibold mb-6 flex items-center">
+                  <span className="mr-2">📋</span>
+                  Diagnostic Results
+                </h3>
+
+                {/* Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gray-800">{debugResults.summary.totalTests}</div>
+                    <div className="text-sm text-gray-600">Total Tests</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">{debugResults.summary.passed}</div>
+                    <div className="text-sm text-green-700">Passed</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">{debugResults.summary.failed}</div>
+                    <div className="text-sm text-red-700">Failed</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {Math.round((debugResults.summary.passed / debugResults.summary.totalTests) * 100)}%
+                    </div>
+                    <div className="text-sm text-blue-700">Success Rate</div>
+                  </div>
+                </div>
+
+                {/* Critical Failures */}
+                {debugResults.summary.criticalFailures.length > 0 && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="font-semibold text-red-800 mb-2">❌ Critical Failures:</h4>
+                    <ul className="text-sm text-red-700 space-y-1">
+                      {debugResults.summary.criticalFailures.map((failure: string, index: number) => (
+                        <li key={index} className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>{failure}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {debugResults.recommendations.length > 0 && (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">💡 Recommendations:</h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      {debugResults.recommendations.map((rec: string, index: number) => (
+                        <li key={index} className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Detailed Results */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold">Detailed Test Results:</h4>
+                  {debugResults.results.map((result: any, index: number) => (
+                    <div key={index} className={`p-3 rounded-lg border ${
+                      result.success 
+                        ? 'bg-green-50 border-green-200' 
+                        : 'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">
+                          {result.success ? '✅' : '❌'} {result.operation}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {result.timestamp.toLocaleTimeString()}
+                        </span>
+                      </div>
+                      
+                      {result.error && (
+                        <div className="mt-2 text-sm text-red-700">
+                          <strong>Error:</strong> {result.error.code} - {result.error.message}
+                        </div>
+                      )}
+                      
+                      {result.details && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <strong>Details:</strong> 
+                          <pre className="whitespace-pre-wrap text-xs mt-1 bg-gray-100 p-2 rounded">
+                            {typeof result.details === 'object' 
+                              ? JSON.stringify(result.details, null, 2) 
+                              : String(result.details)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
