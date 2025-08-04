@@ -4,6 +4,7 @@ import GradeDisplay from './GradeDisplay';
 import ConfidenceIndicator from './ConfidenceIndicator';
 import RateLimitInfo from './RateLimitInfo';
 import { PersonalRankings } from './PersonalRankings';
+import ItemAutocomplete from './ItemAutocomplete';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice, type PackItem } from '../types/itemTypes';
 import { savePackAnalysis } from '../firebase/historical';
 import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
@@ -45,6 +46,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [showAddPackModal, setShowAddPackModal] = useState(false);
   const [useUtilityAdjustment, setUseUtilityAdjustment] = useState(false);
   const [showPersonalRankings, setShowPersonalRankings] = useState(false);
+  const [useAutocomplete, setUseAutocomplete] = useState(true); // Default to autocomplete
   
   const analytics = useAnalytics();
 
@@ -442,25 +444,46 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
             </p>
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* Utility Adjustment Toggle */}
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useUtilityAdjustment}
-                  onChange={(e) => setUseUtilityAdjustment(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-                />
-                <span>⚖️ Utility Adjustments</span>
-              </label>
-              <button
+          <div className="flex items-center justify-between gap-4">
+            {/* Utility Adjustment Toggle - Styled Switch */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700">⚖️ Utility Adjustments</span>
+                <button
+                  onClick={() => setUseUtilityAdjustment(!useUtilityAdjustment)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                    useUtilityAdjustment 
+                      ? 'bg-gradient-to-r from-primary-600 to-primary-700' 
+                      : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                  role="switch"
+                  aria-checked={useUtilityAdjustment}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full transition-transform shadow-lg ${
+                      useUtilityAdjustment 
+                        ? 'translate-x-6 bg-gray-50' 
+                        : 'translate-x-1 bg-gray-100'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              {/* Customize Button - More Prominent */}
+              <motion.button
                 onClick={() => setShowPersonalRankings(true)}
-                className="text-xs text-primary-600 hover:text-primary-700 underline"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                  useUtilityAdjustment
+                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 shadow-lg border-2 border-gray-400 dark:border-gray-500'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600'
+                }`}
                 title="Customize how much you value each item type"
               >
-                Customize
-              </button>
+                <span>🎯</span>
+                <span>Customize Values</span>
+              </motion.button>
             </div>
             
             <button
@@ -499,12 +522,29 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                 <label className="block text-sm font-semibold text-secondary-700">
                   Pack Contents
                 </label>
-                <button
-                  onClick={addItem}
-                  className="btn-secondary text-sm"
-                >
-                  + Add Item
-                </button>
+                <div className="flex items-center space-x-3">
+                  {/* Input method toggle */}
+                  <div className="flex items-center space-x-2 text-sm">
+                    <span className="text-gray-600">Input:</span>
+                    <button
+                      type="button"
+                      onClick={() => setUseAutocomplete(!useAutocomplete)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                        useAutocomplete
+                          ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                      }`}
+                    >
+                      {useAutocomplete ? '🔍 Search' : '📋 Dropdown'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={addItem}
+                    className="btn-secondary text-sm"
+                  >
+                    + Add Item
+                  </button>
+                </div>
               </div>
 
               {packItems.length === 0 && (
@@ -526,22 +566,31 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                         <label className="block text-xs font-medium text-secondary-600 mb-2">
                           Item Type
                         </label>
-                        <select
-                          value={item.itemTypeId}
-                          onChange={(e) => updateItem(index, 'itemTypeId', e.target.value)}
-                          className="input-field text-sm"
-                        >
-                          <option value="">Select item...</option>
-                          {Object.values(ITEM_CATEGORIES).map(category => (
-                            <optgroup key={category} label={category}>
-                              {getItemTypesByCategory(category).map(itemType => (
-                                <option key={itemType.id} value={itemType.id}>
-                                  {itemType.name}
-                                </option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
+                        {useAutocomplete ? (
+                          <ItemAutocomplete
+                            value={item.itemTypeId}
+                            onChange={(itemId) => updateItem(index, 'itemTypeId', itemId)}
+                            placeholder="Type to search items..."
+                            className="w-full"
+                          />
+                        ) : (
+                          <select
+                            value={item.itemTypeId}
+                            onChange={(e) => updateItem(index, 'itemTypeId', e.target.value)}
+                            className="input-field text-sm"
+                          >
+                            <option value="">Select item...</option>
+                            {Object.values(ITEM_CATEGORIES).map(category => (
+                              <optgroup key={category} label={category}>
+                                {getItemTypesByCategory(category).map(itemType => (
+                                  <option key={itemType.id} value={itemType.id}>
+                                    {itemType.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-secondary-600 mb-2">

@@ -44,7 +44,12 @@ export default function ItemValues() {
       // Convert to ItemValue array
       const values: ItemValue[] = Object.entries(itemStats).map(([itemTypeId, stats]) => {
         const itemType = getItemTypeById(itemTypeId);
-        const averagePrice = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
+        const rawPrice = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
+        
+        // Apply currency scaling
+        const { scale } = getCurrencyScaling(itemType);
+        const averagePrice = rawPrice * scale;
+        
         const utilityScore = getUtilityScore(itemType);
         const utilityAdjustedPrice = calculateUtilityAdjustedPrice(averagePrice, utilityScore);
         
@@ -101,6 +106,45 @@ export default function ItemValues() {
   const filteredValues = selectedCategory === 'all' 
     ? itemValues 
     : itemValues.filter(item => item.category === selectedCategory);
+
+  // Scale currency prices to meaningful units
+  const getCurrencyScaling = (itemType: any): { scale: number; unit: string } => {
+    if (!itemType || itemType.category !== 'Currency') {
+      return { scale: 1, unit: '' };
+    }
+    
+    switch (itemType.id) {
+      case 'silver':
+        return { scale: 10000, unit: ' per 10k' };
+      case 'gems':
+        return { scale: 100, unit: ' per 100' };
+      default:
+        return { scale: 1, unit: '' };
+    }
+  };
+
+  // Format price with appropriate decimal places
+  const formatPrice = (price: number): string => {
+    if (!isFinite(price) || price === 0 || isNaN(price)) return '0.00';
+    
+    // For values >= 1, show 2 decimal places
+    if (price >= 1) {
+      return price.toFixed(2);
+    }
+    // For values < 1 but >= 0.01, show 3 decimal places
+    else if (price >= 0.01) {
+      return price.toFixed(3);
+    }
+    // For very small values > 0, show up to 4 decimal places but remove trailing zeros
+    else if (price > 0) {
+      const formatted = price.toFixed(4);
+      // Remove trailing zeros and decimal point if not needed
+      return formatted.replace(/\.?0+$/, '') || '0.00';
+    }
+    else {
+      return '0.00';
+    }
+  };
 
   if (loading) {
     return (
@@ -206,45 +250,32 @@ export default function ItemValues() {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
-                    <h3 className="text-lg font-semibold text-secondary-800">{item.itemName}</h3>
-                    {item.utilityScore !== 5 && (
-                      <div className="flex items-center space-x-2 bg-white/60 px-2 py-1 rounded-lg border border-gray-200">
-                        <span className="text-xs font-medium text-gray-700">Utility:</span>
-                        <div className="flex space-x-1">
-                          {Array.from({ length: 10 }, (_, i) => (
-                            <span
-                              key={i}
-                              className={`text-sm ${
-                                i < item.utilityScore ? 'text-amber-500' : 'text-gray-300'
-                              }`}
-                            >
-                              ★
-                            </span>
-                          ))}
-                        </div>
-                        <span className="text-xs font-medium text-gray-700 ml-1">({item.utilityScore}/10)</span>
-                      </div>
-                    )}
+                    <h3 className="text-lg font-semibold text-secondary-600 dark:text-gray-300">{item.itemName}</h3>
                   </div>
-                  <p className="text-sm text-secondary-600">{item.category}</p>
+                  <p className="text-sm text-secondary-500 dark:text-gray-400">{item.category}</p>
                 </div>
                 
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-primary-600">
-                    ${showUtilityAdjusted 
-                      ? (item.utilityAdjustedPrice && isFinite(item.utilityAdjustedPrice)) 
-                        ? item.utilityAdjustedPrice.toFixed(4) 
-                        : '0.0000'
-                      : (item.averagePrice && isFinite(item.averagePrice)) 
-                        ? item.averagePrice.toFixed(4) 
-                        : '0.0000'
-                    }
-                  </div>
-                  {showUtilityAdjusted && item.averagePrice !== item.utilityAdjustedPrice && (
-                    <div className="text-sm text-secondary-500">
-                      Market: ${(item.averagePrice && isFinite(item.averagePrice)) ? item.averagePrice.toFixed(4) : '0.0000'}
-                    </div>
-                  )}
+                  {(() => {
+                    const itemType = getItemTypeById(item.itemTypeId);
+                    const { unit } = getCurrencyScaling(itemType);
+                    return (
+                      <>
+                        <div className="text-2xl font-bold text-primary-600">
+                          ${showUtilityAdjusted 
+                            ? formatPrice(item.utilityAdjustedPrice)
+                            : formatPrice(item.averagePrice)
+                          }
+                          {unit && <span className="text-sm text-secondary-500 ml-1">{unit}</span>}
+                        </div>
+                        {showUtilityAdjusted && item.averagePrice !== item.utilityAdjustedPrice && (
+                          <div className="text-sm text-secondary-500">
+                            Market: ${formatPrice(item.averagePrice)}{unit && <span>{unit}</span>}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   <ConfidenceIndicator 
                     totalQuantity={item.totalQuantity}
                     packCount={item.packCount}

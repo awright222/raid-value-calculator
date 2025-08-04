@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById } from '../types/itemTypes';
 import RateLimitInfo from './RateLimitInfo';
+import ItemAutocomplete from './ItemAutocomplete';
 
 interface PackSubmissionProps {
   onSubmissionComplete?: (success: boolean, message: string) => void;
@@ -26,6 +27,7 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
   const [submitterEmail, setSubmitterEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
+  const [useAutocomplete, setUseAutocomplete] = useState(true); // Default to autocomplete
 
   // Calculate totals from items
   const energyPots = formData.items.find(item => item.itemTypeId === 'energy_pot')?.quantity || 0;
@@ -242,14 +244,31 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
             <label id="pack-items-label" className="block text-sm font-medium text-secondary-700">
               Pack Items
             </label>
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
-              aria-describedby="pack-items-label"
-            >
-              + Add Item
-            </button>
+            <div className="flex items-center space-x-3">
+              {/* Input method toggle */}
+              <div className="flex items-center space-x-2 text-sm">
+                <span className="text-gray-600">Input:</span>
+                <button
+                  type="button"
+                  onClick={() => setUseAutocomplete(!useAutocomplete)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    useAutocomplete
+                      ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                  }`}
+                >
+                  {useAutocomplete ? '🔍 Search' : '📋 Dropdown'}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                aria-describedby="pack-items-label"
+              >
+                + Add Item
+              </button>
+            </div>
           </div>
 
           {formData.items.map((item, index) => (
@@ -263,24 +282,33 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
                 <label htmlFor={`item-type-${index}`} className="sr-only">
                   Item Type
                 </label>
-                <select
-                  id={`item-type-${index}`}
-                  name={`item-type-${index}`}
-                  value={item.itemTypeId}
-                  onChange={(e) => handleItemChange(index, 'itemTypeId', e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
-                >
-                  <option value="">Select item type</option>
-                  {Object.entries(ITEM_CATEGORIES).map(([categoryKey, categoryName]) => (
-                    <optgroup key={categoryKey} label={categoryName}>
-                      {getItemTypesByCategory(categoryName).map(itemType => (
-                        <option key={itemType.id} value={itemType.id}>
-                          {itemType.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                {useAutocomplete ? (
+                  <ItemAutocomplete
+                    value={item.itemTypeId}
+                    onChange={(itemId) => handleItemChange(index, 'itemTypeId', itemId)}
+                    placeholder="Search for item type..."
+                    className="w-full"
+                  />
+                ) : (
+                  <select
+                    id={`item-type-${index}`}
+                    name={`item-type-${index}`}
+                    value={item.itemTypeId}
+                    onChange={(e) => handleItemChange(index, 'itemTypeId', e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
+                  >
+                    <option value="">Select item type</option>
+                    {Object.entries(ITEM_CATEGORIES).map(([categoryKey, categoryName]) => (
+                      <optgroup key={categoryKey} label={categoryName}>
+                        {getItemTypesByCategory(categoryName).map(itemType => (
+                          <option key={itemType.id} value={itemType.id}>
+                            {itemType.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>

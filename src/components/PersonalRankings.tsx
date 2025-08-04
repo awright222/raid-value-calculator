@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ITEM_CATEGORIES, getItemTypesByCategory, type ItemType } from '../types/itemTypes';
+import { ITEM_CATEGORIES, getItemTypes, type ItemType } from '../types/itemTypes';
 import { 
   getUserUtilityPreferences, 
   updateItemUtilityScore, 
@@ -15,12 +15,31 @@ interface PersonalRankingsProps {
 
 export const PersonalRankings: React.FC<PersonalRankingsProps> = ({ isOpen, onClose }) => {
   const [preferences, setPreferences] = useState(getUserUtilityPreferences());
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setPreferences(getUserUtilityPreferences());
+      loadItemTypes();
     }
   }, [isOpen]);
+
+  const loadItemTypes = async () => {
+    setLoading(true);
+    try {
+      const types = await getItemTypes();
+      setItemTypes(types);
+    } catch (error) {
+      console.error('Failed to load item types:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getItemTypesByCategory = (category: string): ItemType[] => {
+    return itemTypes.filter(item => item.category === category);
+  };
 
   const handleScoreChange = (itemId: string, score: number) => {
     const newPrefs = { ...preferences, [itemId]: score };
@@ -114,7 +133,15 @@ export const PersonalRankings: React.FC<PersonalRankingsProps> = ({ isOpen, onCl
 
           {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-            <div className="space-y-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading item types...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
               {Object.values(ITEM_CATEGORIES).map((category) => {
                 const items = getItemTypesByCategory(category);
                 if (items.length === 0) return null;
@@ -195,6 +222,7 @@ export const PersonalRankings: React.FC<PersonalRankingsProps> = ({ isOpen, onCl
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* Footer */}

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, type PackItem } from '../types/itemTypes';
+import { ITEM_CATEGORIES, getItemTypes, getItemTypesByCategory, getItemTypeById, type PackItem, type ItemType } from '../types/itemTypes';
 import { addPack } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
+import { updateMultipleItemTypeUtilityScores, checkItemTypesExistInFirebase, initializeItemTypesInFirebase } from '../firebase/itemTypes';
 import { testFirebaseConnection } from '../firebase/connectionTest';
 import { createFirebaseDebugger } from '../utils/firebaseDebugger';
 import { diagnosePricingServiceIssue } from '../utils/itemValuesDiagnostic';
@@ -59,6 +60,33 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
   // Utility management state
   const [utilityEdits, setUtilityEdits] = useState<{[itemId: string]: number}>({});
   const [utilitySaving, setUtilitySaving] = useState(false);
+  const [adminItemTypes, setAdminItemTypes] = useState<ItemType[]>([]);
+  const [adminItemTypesLoading, setAdminItemTypesLoading] = useState(false);
+
+  // Load item types from Firebase for admin panel
+  const loadAdminItemTypes = async () => {
+    setAdminItemTypesLoading(true);
+    try {
+      const types = await getItemTypes();
+      setAdminItemTypes(types);
+    } catch (error) {
+      console.error('Failed to load admin item types:', error);
+    } finally {
+      setAdminItemTypesLoading(false);
+    }
+  };
+
+  // Filter item types by category (Firebase-aware)
+  const getAdminItemTypesByCategory = (category: string): ItemType[] => {
+    return adminItemTypes.filter(item => item.category === category);
+  };
+
+  // Load admin item types when utility tab is accessed
+  useEffect(() => {
+    if (activeAdminTab === 'utility') {
+      loadAdminItemTypes();
+    }
+  }, [activeAdminTab]);
 
   const adminTabs = [
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
@@ -937,9 +965,17 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
               </p>
             </div>
 
-            <div className="space-y-6">
+            {adminItemTypesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading item types...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
               {Object.values(ITEM_CATEGORIES).map((category) => {
-                const items = getItemTypesByCategory(category);
+                const items = getAdminItemTypesByCategory(category);
                 if (items.length === 0) return null;
 
                 return (
@@ -1000,15 +1036,49 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                   onClick={async () => {
                     setUtilitySaving(true);
                     try {
-                      // TODO: Implement saving to Firebase
+                      console.log('Starting utility score save process...');
                       console.log('Utility edits to save:', utilityEdits);
-                      // Simulate API call
-                      await new Promise(resolve => setTimeout(resolve, 1000));
-                      setSuccess('Utility scores updated successfully!');
+                      
+                      // Check if item types exist in Firebase, if not, initialize them
+                      const itemTypesExist = await checkItemTypesExistInFirebase();
+                      console.log('Item types exist:', itemTypesExist);
+                      
+                      if (!itemTypesExist) {
+                        console.log('Initializing item types in Firebase...');
+                        // Initialize item types in Firebase with current static data
+                        const { ITEM_TYPES } = await import('../types/itemTypes');
+                        await initializeItemTypesInFirebase(ITEM_TYPES);
+                        console.log('Item types initialized successfully');
+                      }
+                      
+                      // Save utility score changes to Firebase
+                      console.log('Saving utility scores...');
+                      await updateMultipleItemTypeUtilityScores(utilityEdits);
+                      console.log('Utility scores saved successfully');
+                      
+                      // Invalidate cache so changes are visible immediately
+                      const { invalidateItemTypesCache } = await import('../types/itemTypes');
+                      invalidateItemTypesCache();
+                      
+                      setSuccess('Utility scores updated successfully in Firebase!');
+                      setUtilityEdits({}); // Clear the edits after successful save
                       setTimeout(() => setSuccess(''), 3000);
                     } catch (error) {
-                      setError('Failed to save utility scores');
-                      setTimeout(() => setError(''), 3000);
+                      console.error('Error saving utility scores:', error);
+                      let errorMessage = 'Failed to save utility scores to Firebase';
+                      
+                      if (error instanceof Error) {
+                        if (error.message.includes('permission')) {
+                          errorMessage = 'Permission denied - check Firebase security rules';
+                        } else if (error.message.includes('network')) {
+                          errorMessage = 'Network error - please check your connection';
+                        } else {
+                          errorMessage = `Firebase error: ${error.message}`;
+                        }
+                      }
+                      
+                      setError(errorMessage);
+                      setTimeout(() => setError(''), 5000);
                     } finally {
                       setUtilitySaving(false);
                     }
@@ -1026,6 +1096,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                 </motion.button>
               </div>
             </div>
+            )}
           </div>
         )}
 

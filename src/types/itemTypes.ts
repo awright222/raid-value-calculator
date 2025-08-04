@@ -286,6 +286,14 @@ export const ITEM_TYPES: ItemType[] = [
     utilityScore: 10,
     utilityReasoning: 'Maximum value - guaranteed epic or legendary champion'
   },
+  {
+    id: 'prism_crystals',
+    name: 'Prism Crystals',
+    category: ITEM_CATEGORIES.SUMMONING,
+    description: 'Premium summoning crystals',
+    utilityScore: 9,
+    utilityReasoning: 'Very high value - rare premium summoning resource'
+  },
 
   // Soul Summoning
   {
@@ -382,6 +390,57 @@ export const ITEM_TYPES: ItemType[] = [
   }
 ];
 
+// Cache for Firebase-loaded item types
+let firebaseItemTypesCache: ItemType[] | null = null;
+let firebaseLoadPromise: Promise<ItemType[]> | null = null;
+
+// Function to get item types from Firebase with fallback to static
+export const getItemTypes = async (): Promise<ItemType[]> => {
+  // Return cached version if available
+  if (firebaseItemTypesCache) {
+    console.log('Returning cached Firebase item types');
+    return firebaseItemTypesCache;
+  }
+  
+  // Return ongoing promise if already loading
+  if (firebaseLoadPromise) {
+    console.log('Waiting for ongoing Firebase load...');
+    return firebaseLoadPromise;
+  }
+  
+  // Try to load from Firebase
+  firebaseLoadPromise = (async () => {
+    try {
+      console.log('Attempting to load item types from Firebase...');
+      const { getItemTypesFromFirebase } = await import('../firebase/itemTypes');
+      const firebaseItemTypes = await getItemTypesFromFirebase();
+      
+      if (firebaseItemTypes.length > 0) {
+        console.log(`Loaded ${firebaseItemTypes.length} item types from Firebase`);
+        firebaseItemTypesCache = firebaseItemTypes;
+        return firebaseItemTypes;
+      } else {
+        console.log('No item types found in Firebase, using static data');
+      }
+    } catch (error) {
+      console.warn('Failed to load item types from Firebase, using static data:', error);
+    }
+    
+    // Fallback to static data
+    console.log('Using static item types data');
+    return ITEM_TYPES;
+  })();
+  
+  return firebaseLoadPromise;
+};
+
+// Function to invalidate cache (call after admin updates)
+export const invalidateItemTypesCache = (): void => {
+  firebaseItemTypesCache = null;
+  firebaseLoadPromise = null;
+};
+
+// Synchronous function for backward compatibility (uses static data)
 export function getItemTypeById(id: string): ItemType | undefined {
   return ITEM_TYPES.find(item => item.id === id);
 }
