@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getItemTypesByCategory, ITEM_CATEGORIES } from '../types/itemTypes';
 import type { ItemType } from '../types/itemTypes';
@@ -17,9 +18,10 @@ export default function ItemAutocomplete({
   className = ""
 }: ItemAutocompleteProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   // Get all items flattened with category info
@@ -39,13 +41,19 @@ export default function ItemAutocomplete({
 
   // Get selected item name for display
   const selectedItem = allItems.find(item => item.id === value);
-  const displayValue = selectedItem ? selectedItem.name : searchTerm;
+  const displayValue = selectedItem ? selectedItem.name : '';
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isModalOpen) {
       setSelectedIndex(-1);
+      setSearchTerm('');
+    } else {
+      // Focus search input when modal opens
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
     }
-  }, [isOpen]);
+  }, [isModalOpen]);
 
   useEffect(() => {
     // Reset search when value changes externally
@@ -54,34 +62,24 @@ export default function ItemAutocomplete({
     }
   }, [value, selectedItem]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSearchTerm = e.target.value;
-    setSearchTerm(newSearchTerm);
-    setIsOpen(true);
+  const handleInputClick = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
     setSelectedIndex(-1);
-    
-    // If input is cleared, clear the selection
-    if (!newSearchTerm && !selectedItem) {
-      onChange('');
-    }
   };
 
   const handleItemSelect = (itemId: string) => {
     onChange(itemId);
     setSearchTerm('');
-    setIsOpen(false);
+    setIsModalOpen(false);
     setSelectedIndex(-1);
-    inputRef.current?.blur();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
-        setIsOpen(true);
-        e.preventDefault();
-      }
-      return;
-    }
+    if (!isModalOpen) return;
 
     switch (e.key) {
       case 'ArrowDown':
@@ -105,28 +103,9 @@ export default function ItemAutocomplete({
         }
         break;
       case 'Escape':
-        setIsOpen(false);
-        setSearchTerm('');
-        inputRef.current?.blur();
-        break;
-      case 'Tab':
-        setIsOpen(false);
+        setIsModalOpen(false);
         break;
     }
-  };
-
-  const handleFocus = () => {
-    setIsOpen(true);
-  };
-
-  const handleBlur = () => {
-    // Delay hiding to allow for item clicks
-    setTimeout(() => {
-      setIsOpen(false);
-      if (!selectedItem && !searchTerm) {
-        setSearchTerm('');
-      }
-    }, 150);
   };
 
   // Scroll selected item into view
@@ -143,22 +122,19 @@ export default function ItemAutocomplete({
   }, [selectedIndex]);
 
   return (
-    <div className={`relative ${className}`}>
-      <div className="relative">
+    <>
+      <div className={`relative ${className}`}>
         <input
           ref={inputRef}
           type="text"
           value={displayValue}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
+          onClick={handleInputClick}
+          readOnly
           placeholder={placeholder}
-          className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full pr-10"
-          autoComplete="off"
+          className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full pr-10 cursor-pointer"
         />
         
-        {/* Search/dropdown icon */}
+        {/* Search icon */}
         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
           <svg
             className="h-4 w-4 text-gray-400"
@@ -166,16 +142,12 @@ export default function ItemAutocomplete({
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            {isOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            )}
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
 
         {/* Selected item indicator */}
-        {selectedItem && !searchTerm && (
+        {selectedItem && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -186,43 +158,94 @@ export default function ItemAutocomplete({
         )}
       </div>
 
-      {/* Dropdown list */}
-      <AnimatePresence>
-        {isOpen && (
+      {/* Search Modal with Portal */}
+      {isModalOpen && createPortal(
+        <AnimatePresence>
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
-            className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+            style={{ zIndex: 2147483647 }} // Maximum z-index value
+            onClick={() => setIsModalOpen(false)}
           >
-            <ul ref={listRef} className="py-1">
-              {filteredItems.length > 0 ? (
-                filteredItems.map((item, index) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleItemSelect(item.id)}
-                      className={`w-full text-left px-3 py-2 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors ${
-                        index === selectedIndex ? 'bg-primary-50 text-primary-600' : 'text-gray-900'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-xs text-gray-500 ml-2">{item.category}</span>
-                      </div>
-                    </button>
-                  </li>
-                ))
-              ) : (
-                <li className="px-3 py-2 text-gray-500 text-sm">
-                  No items found for "{searchTerm}"
-                </li>
-              )}
-            </ul>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+              style={{ zIndex: 2147483647 }} // Maximum z-index value
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Search Items</h3>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                {/* Search Input */}
+                <div className="relative">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type to search items..."
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results */}
+              <div className="flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto">
+                  <ul ref={listRef} className="p-2">
+                    {filteredItems.length > 0 ? (
+                      filteredItems.map((item, index) => (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleItemSelect(item.id)}
+                            className={`w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 focus:bg-gray-50 focus:outline-none transition-colors ${
+                              index === selectedIndex ? 'bg-primary-50 text-primary-600' : 'text-gray-900'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-lg">{item.name}</span>
+                              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                {item.category}
+                              </span>
+                            </div>
+                          </button>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-4 py-8 text-center text-gray-500">
+                        {searchTerm ? `No items found for "${searchTerm}"` : 'Start typing to search items...'}
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   );
 }
