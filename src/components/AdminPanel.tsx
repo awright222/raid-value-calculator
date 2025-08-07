@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ITEM_CATEGORIES, getItemTypes, getItemTypesByCategory, getItemTypeById, type PackItem, type ItemType } from '../types/itemTypes';
+import { ITEM_CATEGORIES, getItemTypes, getItemTypeById, type PackItem, type ItemType } from '../types/itemTypes';
 import { addPack } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
 import { updateMultipleItemTypeUtilityScores, checkItemTypesExistInFirebase, initializeItemTypesInFirebase } from '../firebase/itemTypes';
@@ -9,6 +9,7 @@ import { createFirebaseDebugger } from '../utils/firebaseDebugger';
 import { diagnosePricingServiceIssue } from '../utils/itemValuesDiagnostic';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
+import ItemAutocomplete from './ItemAutocomplete';
 import type { PendingPack } from '../utils/duplicateDetection';
 
 interface AdminPanelProps {
@@ -788,22 +789,14 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                     animate={{ opacity: 1, y: 0 }}
                     className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 p-4 bg-gray-50 rounded-xl"
                   >
-                    <select
-                      value={item.itemTypeId}
-                      onChange={(e) => updateItem(index, 'itemTypeId', e.target.value)}
-                      className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    >
-                      <option value="">Select item type</option>
-                      {Object.entries(ITEM_CATEGORIES).map(([categoryKey, categoryName]) => (
-                        <optgroup key={categoryKey} label={categoryName}>
-                          {getItemTypesByCategory(categoryName).map(itemType => (
-                            <option key={itemType.id} value={itemType.id}>
-                              {itemType.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                    <div>
+                      <ItemAutocomplete
+                        value={item.itemTypeId}
+                        onChange={(itemId) => updateItem(index, 'itemTypeId', itemId)}
+                        placeholder="Search for item type..."
+                        className="w-full"
+                      />
+                    </div>
 
                     <input
                       type="number"
