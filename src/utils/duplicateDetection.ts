@@ -149,9 +149,7 @@ export function validatePackData(pack: Omit<PendingPack, 'id' | 'submitter_id' |
       if (item.quantity <= 0) {
         errors.push('All items must have a positive quantity');
       }
-      if (item.quantity > 10000) {
-        errors.push('Item quantities seem unusually high');
-      }
+      // Removed quantity upper limit check - silver and other items can legitimately have very high quantities
     }
   }
   
