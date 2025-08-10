@@ -146,16 +146,7 @@ export default function ItemAutocomplete({
           </svg>
         </div>
 
-        {/* Selected item indicator */}
-        {selectedItem && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"
-          >
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          </motion.div>
-        )}
+        {/* Removed selected item indicator as it was covering text */}
       </div>
 
       {/* Search Modal with Portal */}
