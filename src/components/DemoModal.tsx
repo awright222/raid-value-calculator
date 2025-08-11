@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { trackVideoEvent } from '../firebase/videoAnalytics';
 
+// Test if import is working
+console.log('[VIDEO ANALYTICS] DemoModal loaded, trackVideoEvent function:', typeof trackVideoEvent);
+console.warn('[VIDEO ANALYTICS] DemoModal loaded, trackVideoEvent function:', typeof trackVideoEvent);
+
 interface DemoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,12 +26,14 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
   // Track when modal is opened (video view)
   useEffect(() => {
     if (isOpen) {
+      console.log('🎬 Demo video modal opened');
       trackVideoEvent('view');
     }
   }, [isOpen]);
 
   // Track when modal is closed
   const handleClose = () => {
+    console.log('[VIDEO ANALYTICS] Modal close event triggered');
     const video = videoRef.current;
     if (video && !video.paused) {
       trackVideoEvent('close', video.currentTime, video.duration);
@@ -37,13 +43,16 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
 
   // Video event handlers
   const handleVideoPlay = () => {
+    console.log('🎬 Video play event');
     const video = videoRef.current;
     if (video) {
+      console.log('🎬 Video current time:', video.currentTime, 'duration:', video.duration);
       trackVideoEvent('play', video.currentTime, video.duration);
     }
   };
 
   const handleVideoPause = () => {
+    console.log('⏸️ Video pause event');
     const video = videoRef.current;
     if (video) {
       trackVideoEvent('pause', video.currentTime, video.duration);
@@ -51,6 +60,7 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleVideoSeek = () => {
+    console.log('⏭️ Video seek event');
     const video = videoRef.current;
     if (video) {
       trackVideoEvent('seek', video.currentTime, video.duration);
@@ -58,6 +68,7 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleVideoEnded = () => {
+    console.log('✅ Video ended event');
     const video = videoRef.current;
     if (video) {
       trackVideoEvent('ended', video.currentTime, video.duration);

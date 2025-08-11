@@ -6,11 +6,11 @@ import RateLimitInfo from './RateLimitInfo';
 import { PersonalRankings } from './PersonalRankings';
 import ItemAutocomplete from './ItemAutocomplete';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice, type PackItem } from '../types/itemTypes';
-import { savePackAnalysis } from '../firebase/historical';
+// TEMPORARILY DISABLED: import { savePackAnalysis } from '../firebase/historical'; // Causing 400 errors
 import { calculateItemPrices, analyzePackValueNew } from '../services/pricingService';
-import { useAnalytics } from '../services/analytics';
+// TEMPORARILY DISABLED: import { useAnalytics } from '../services/analytics'; // Causing 400 errors
 import { checkRateLimit, showRateLimitWarning } from '../utils/rateLimiter';
-import { Timestamp } from 'firebase/firestore';
+// TEMPORARILY DISABLED: import { Timestamp } from 'firebase/firestore'; // Causing 400 errors
 
 interface AnalysisResult {
   total_energy: number;
@@ -47,8 +47,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
   const [useUtilityAdjustment, setUseUtilityAdjustment] = useState(false);
   const [showPersonalRankings, setShowPersonalRankings] = useState(false);
   const [useAutocomplete, setUseAutocomplete] = useState(true); // Default to autocomplete
-  
-  const analytics = useAnalytics();
+  // TEMPORARILY DISABLED: const analytics = useAnalytics(); // Causing 400 errors
 
   // Smart price display for very small values
   const formatSmartPrice = (price: number, itemId?: string): string => {
@@ -76,6 +75,7 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
 
   useEffect(() => {
     loadItemPrices();
+    console.log('📦 PackAnalyzer loaded - loadItemPrices() re-enabled');
   }, []);
 
   const getGradeColor = (grade: string) => {
@@ -150,6 +150,29 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       marketPricePerUnit: number;
     }> = [];
 
+    console.log('🧮 Starting individual item analysis for', packItems.length, 'items');
+    const actualPrice = parseFloat(price) || 0;
+    console.log('💰 Pack price:', actualPrice);
+
+    // First, calculate total pack market value ONCE
+    const totalPackMarketValue = packItems.reduce((sum, pi) => {
+      const piItemType = getItemTypeById(pi.itemTypeId);
+      let piMarketPrice = itemPrices[pi.itemTypeId] || 0;
+      
+      // Apply utility adjustment if enabled
+      if (useUtilityAdjustment && piItemType) {
+        const utilityScore = getUtilityScore(piItemType, useUtilityAdjustment);
+        piMarketPrice = calculateUtilityAdjustedPrice(piMarketPrice, utilityScore);
+      }
+      
+      const piTotalValue = piMarketPrice * pi.quantity;
+      console.log(`📊 ${piItemType?.name || pi.itemTypeId}: ${pi.quantity} × $${piMarketPrice.toFixed(6)} = $${piTotalValue.toFixed(2)}`);
+      
+      return sum + piTotalValue;
+    }, 0);
+    
+    console.log('💎 Total pack market value:', totalPackMarketValue);
+
     packItems.forEach(item => {
       const itemType = getItemTypeById(item.itemTypeId);
       let marketPricePerUnit = itemPrices[item.itemTypeId] || 0;
@@ -165,14 +188,24 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       totalMarketValue += itemMarketValue;
       
       // Calculate individual item value grade
-      const actualPrice = parseFloat(price) || 0;
-      const costPerUnit = actualPrice > 0 ? (actualPrice / packItems.reduce((sum, pi) => sum + pi.quantity, 0)) : 0;
-      
       let valueGrade = 'C';
       let valueRating = 'Fair Value';
       
+      // Calculate this item's proportional cost from the pack
+      const itemMarketValueShare = itemMarketValue;
+      const itemProportionalCost = totalPackMarketValue > 0 ? 
+        (actualPrice * itemMarketValueShare / totalPackMarketValue) : 0;
+      const costPerUnit = item.quantity > 0 ? itemProportionalCost / item.quantity : 0;
+      
+      console.log(`🔍 ${itemType?.name || item.itemTypeId}:`);
+      console.log(`   Market price per unit: $${marketPricePerUnit.toFixed(6)}`);
+      console.log(`   Item market value: $${itemMarketValue.toFixed(2)}`);
+      console.log(`   Proportional cost: $${itemProportionalCost.toFixed(2)}`);
+      console.log(`   Cost per unit: $${costPerUnit.toFixed(6)}`);
+      
       if (marketPricePerUnit > 0 && costPerUnit > 0) {
         const valueRatio = marketPricePerUnit / costPerUnit;
+        console.log(`   Value ratio: ${valueRatio.toFixed(3)} (${marketPricePerUnit.toFixed(6)} / ${costPerUnit.toFixed(6)})`);
         
         if (valueRatio >= 2.0) {
           valueGrade = 'S+';
@@ -196,6 +229,10 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
           valueGrade = 'F';
           valueRating = 'Bad Deal';
         }
+        
+        console.log(`   📋 Final grade: ${valueGrade} (${valueRating})`);
+      } else {
+        console.log(`   ⚠️ Cannot calculate grade: marketPrice=${marketPricePerUnit}, costPerUnit=${costPerUnit}`);
       }
       
       itemBreakdown.push({
@@ -209,7 +246,6 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       });
     });
 
-    const actualPrice = parseFloat(price) || 0;
     const discountPercent = totalMarketValue > 0 ? ((totalMarketValue - actualPrice) / totalMarketValue) * 100 : 0;
 
     return {
@@ -261,8 +297,8 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       
       const analysis = await analyzePackValueNew(packItemsForAnalysis, parseFloat(price));
       
-      // Get item prices for historical data
-      const { itemPrices } = await calculateItemPrices();
+      // TEMPORARILY DISABLED: Get item prices for historical data (not used)
+      // const { itemPrices } = await calculateItemPrices();
       
       const resultData = {
         total_energy: 0, // No longer calculating energy
@@ -279,56 +315,56 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       
       setResult(resultData);
 
-      // Track pack analysis for analytics
-      analytics.trackConversion('calculator_use', {
-        packPrice: parseFloat(price),
-        grade: resultData.grade,
-        totalEnergy: 0, // No longer calculating
-        itemCount: packItems.length,
-        hasEnergyPots: packItems.some(item => item.itemTypeId === 'energy_pot'),
-        hasRawEnergy: packItems.some(item => item.itemTypeId === 'raw_energy')
-      });
+      // TEMPORARILY DISABLED: Track pack analysis for analytics (causing 400 error)
+      // analytics.trackConversion('calculator_use', {
+      //   packPrice: parseFloat(price),
+      //   grade: resultData.grade,
+      //   totalEnergy: 0, // No longer calculating
+      //   itemCount: packItems.length,
+      //   hasEnergyPots: packItems.some(item => item.itemTypeId === 'energy_pot'),
+      //   hasRawEnergy: packItems.some(item => item.itemTypeId === 'raw_energy')
+      // });
 
-      // Track pack view for analytics dashboard
-      analytics.trackPackView({
-        packName: packItems.map(item => {
-          const itemType = getItemTypeById(item.itemTypeId);
-          return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
-        }).join(', '),
-        price: parseFloat(price),
-        grade: resultData.grade,
-        energyValue: 0 // No longer calculating
-      });
+      // TEMPORARILY DISABLED: Track pack view for analytics dashboard (causing 400 error)
+      // analytics.trackPackView({
+      //   packName: packItems.map(item => {
+      //     const itemType = getItemTypeById(item.itemTypeId);
+      //     return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
+      //   }).join(', '),
+      //   price: parseFloat(price),
+      //   grade: resultData.grade,
+      //   energyValue: 0 // No longer calculating
+      // });
         
-      // Save pack analysis to historical data
-      try {
-        await savePackAnalysis({
-          packName: packItems.map(item => {
-            const itemType = getItemTypeById(item.itemTypeId);
-            return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
-          }).join(', '),
-          packPrice: parseFloat(price),
-          totalEnergy: 0, // No longer calculating
-          costPerEnergy: 0, // No longer calculating
-          grade: resultData.grade,
-          betterThanPercent: resultData.comparison.better_than_percent,
-          totalPacksCompared: resultData.comparison.total_packs_compared,
-          itemBreakdown: packItems.map(item => {
-            const itemType = getItemTypeById(item.itemTypeId);
-            const itemPrice = itemPrices[item.itemTypeId] || 0;
-            return {
-              itemTypeId: item.itemTypeId,
-              itemName: itemType?.name || 'Unknown Item',
-              quantity: item.quantity,
-              estimatedValue: itemPrice * item.quantity
-            };
-          }),
-          analysisDate: Timestamp.now()
-        });
-        // Analysis saved successfully
-      } catch (error) {
-        // Save failed silently
-      }
+      // TEMPORARILY DISABLED: Save pack analysis to historical data (causing 400 error)
+      // try {
+      //   await savePackAnalysis({
+      //     packName: packItems.map(item => {
+      //       const itemType = getItemTypeById(item.itemTypeId);
+      //       return `${item.quantity}x ${itemType?.name || 'Unknown'}`;
+      //     }).join(', '),
+      //     packPrice: parseFloat(price),
+      //     totalEnergy: 0, // No longer calculating
+      //     costPerEnergy: 0, // No longer calculating
+      //     grade: resultData.grade,
+      //     betterThanPercent: resultData.comparison.better_than_percent,
+      //     totalPacksCompared: resultData.comparison.total_packs_compared,
+      //     itemBreakdown: packItems.map(item => {
+      //       const itemType = getItemTypeById(item.itemTypeId);
+      //       const itemPrice = itemPrices[item.itemTypeId] || 0;
+      //       return {
+      //         itemTypeId: item.itemTypeId,
+      //         itemName: itemType?.name || 'Unknown Item',
+      //         quantity: item.quantity,
+      //         estimatedValue: itemPrice * item.quantity
+      //       };
+      //     }),
+      //     analysisDate: Timestamp.now()
+      //   });
+      //   // Analysis saved successfully
+      // } catch (error) {
+      //   // Save failed silently
+      // }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -759,6 +795,11 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
                             }`}>
                               {valueAnalysis.valueVsMarket > 0 ? `${(valueAnalysis.valueVsMarket && isFinite(valueAnalysis.valueVsMarket)) ? valueAnalysis.valueVsMarket.toFixed(2) : '0.00'}x` : 'N/A'}
                             </p>
+                            {valueAnalysis.valueVsMarket > 0 && (
+                              <p className="text-xs text-secondary-500 mt-1">
+                                {Math.round((valueAnalysis.valueVsMarket && isFinite(valueAnalysis.valueVsMarket) ? valueAnalysis.valueVsMarket : 0) * 100)}¢ per dollar
+                              </p>
+                            )}
                           </motion.div>
                         </div>
 

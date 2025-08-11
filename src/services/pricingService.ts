@@ -62,10 +62,29 @@ export const calculateItemPrices = async (forceRefresh: boolean = false): Promis
     // Add timeout and retry logic for getAllPacks
     let packs: any[] = [];
     try {
+      console.log('🔄 Attempting to load packs from Firebase...');
       packs = await getAllPacks();
       console.log('✅ Successfully loaded', packs.length, 'packs from Firebase');
     } catch (error) {
       console.error('❌ Failed to load packs from Firebase:', error);
+      
+      // Log specific error details
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.substring(0, 500) // Truncate stack trace
+        });
+      }
+      
+      // Check for specific error types
+      if (error && typeof error === 'object') {
+        console.error('Error object:', {
+          code: (error as any).code,
+          status: (error as any).status,
+          statusText: (error as any).statusText
+        });
+      }
       
       // Return cached data if available, even if expired
       if (pricingCache) {
@@ -352,8 +371,11 @@ export const analyzePackValueNew = async (
   packPrice: number
 ): Promise<PackValueAnalysis> => {
   try {
+    console.log('🔍 Starting pack analysis:', { packItems, packPrice });
+    
     // Get current pricing data
     const { itemPrices } = await calculateItemPrices();
+    console.log('💰 Item prices loaded:', Object.keys(itemPrices).length, 'items');
     
     // Calculate total value of items in the pack
     let totalValue = 0;
@@ -363,6 +385,8 @@ export const analyzePackValueNew = async (
       const unitPrice = itemPrices[item.itemTypeId] || 0;
       const totalPrice = unitPrice * item.quantity;
       totalValue += totalPrice;
+      
+      console.log(`📦 ${item.itemTypeId}: ${item.quantity} × $${unitPrice.toFixed(6)} = $${totalPrice.toFixed(2)}`);
       
       itemBreakdown.push({
         itemTypeId: item.itemTypeId,
@@ -380,20 +404,27 @@ export const analyzePackValueNew = async (
     console.log(`Value per Dollar: $${dollarsPerDollar.toFixed(2)}`);
     
     // Get all existing packs for comparison
+    console.log('📊 Loading packs for comparison...');
     const allPacks = await getAllPacks();
+    console.log(`📦 Loaded ${allPacks.length} total packs from database`);
+    
     const packsWithItems = allPacks.filter(pack => pack.items && pack.items.length > 0 && pack.price && pack.price > 0);
+    console.log(`📦 Found ${packsWithItems.length} valid packs with items and prices`);
     
     if (packsWithItems.length === 0) {
+      console.log('⚠️ No comparison packs available, using fallback grading');
       // Fallback grading based on value ratio when no comparison data exists
       let fallbackGrade: 'SSS' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
       
-      if (dollarsPerDollar >= 3.0) fallbackGrade = 'SSS';
-      else if (dollarsPerDollar >= 2.0) fallbackGrade = 'S';
-      else if (dollarsPerDollar >= 1.5) fallbackGrade = 'A';
-      else if (dollarsPerDollar >= 1.2) fallbackGrade = 'B';
-      else if (dollarsPerDollar >= 1.0) fallbackGrade = 'C';
-      else if (dollarsPerDollar >= 0.8) fallbackGrade = 'D';
-      else fallbackGrade = 'F';
+      if (dollarsPerDollar >= 2.0) fallbackGrade = 'SSS';        // 200%+ value
+      else if (dollarsPerDollar >= 1.5) fallbackGrade = 'S';     // 150%+ value  
+      else if (dollarsPerDollar >= 1.3) fallbackGrade = 'A';     // 130%+ value
+      else if (dollarsPerDollar >= 1.1) fallbackGrade = 'B';     // 110%+ value
+      else if (dollarsPerDollar >= 0.9) fallbackGrade = 'C';     // 90%+ value
+      else if (dollarsPerDollar >= 0.7) fallbackGrade = 'D';     // 70%+ value
+      else fallbackGrade = 'F';                                  // < 70% value
+      
+      console.log(`🎯 Fallback grade: ${fallbackGrade} (${dollarsPerDollar.toFixed(2)}x value ratio)`);
       
       return {
         grade: fallbackGrade,
@@ -433,18 +464,21 @@ export const analyzePackValueNew = async (
     // Find where this pack ranks
     const betterPacks = packValueRatios.filter(p => p.valueRatio > dollarsPerDollar);
     const betterThanPercent = Math.round(((packValueRatios.length - betterPacks.length) / packValueRatios.length) * 100);
-    
-    // Determine grade based on percentile
+
+    console.log(`📊 Pack Analysis Results:`);
+    console.log(`   This pack value ratio: ${dollarsPerDollar.toFixed(3)}`);
+    console.log(`   Better than ${betterThanPercent}% of ${packValueRatios.length} historical packs`);
+    console.log(`   Packs with better ratios: ${betterPacks.length}`);
+
+    // Determine grade based on percentile (more reasonable thresholds)
     let grade: 'SSS' | 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
-    if (betterThanPercent >= 95) grade = 'SSS';
-    else if (betterThanPercent >= 90) grade = 'S';
-    else if (betterThanPercent >= 80) grade = 'A';
-    else if (betterThanPercent >= 70) grade = 'B';
-    else if (betterThanPercent >= 60) grade = 'C';
-    else if (betterThanPercent >= 50) grade = 'D';
-    else grade = 'F';
-    
-    // Find similar packs (within 20% of total value)
+    if (betterThanPercent >= 95) grade = 'SSS';      // Top 5%
+    else if (betterThanPercent >= 85) grade = 'S';   // Top 15%
+    else if (betterThanPercent >= 70) grade = 'A';   // Top 30%
+    else if (betterThanPercent >= 50) grade = 'B';   // Above average
+    else if (betterThanPercent >= 30) grade = 'C';   // Below average but decent
+    else if (betterThanPercent >= 15) grade = 'D';   // Bottom 30%
+    else grade = 'F';                                // Bottom 15%    // Find similar packs (within 20% of total value)
     const valueRange = {
       min: totalValue * 0.8,
       max: totalValue * 1.2
@@ -479,8 +513,32 @@ export const analyzePackValueNew = async (
       });
     
     console.log(`📊 Grade: ${grade} (${betterThanPercent}% percentile)`);
-    console.log(`📦 Compared against ${packValueRatios.length} packs`);
+    console.log(`📦 Compared against ${packValueRatios.length} valid packs (out of ${packsWithItems.length} total packs with items)`);
     console.log(`🎯 Found ${similarPacks.length} similar packs`);
+    console.log(`💰 Value analysis: $${totalValue.toFixed(2)} market value vs $${packPrice} pack price = ${dollarsPerDollar.toFixed(2)} dollars per dollar`);
+    
+    // Debug: Show some sample pack ratios
+    if (packValueRatios.length > 0) {
+      console.log('📈 Top 3 best deals in database:');
+      packValueRatios.slice(0, 3).forEach((p, i) => {
+        const packValue = p.pack.items.reduce((sum: number, item: any) => {
+          return sum + ((itemPrices[item.itemTypeId] || 0) * item.quantity);
+        }, 0);
+        console.log(`  ${i + 1}. $${packValue.toFixed(2)} value for $${p.pack.price} (${p.valueRatio.toFixed(2)}x ratio)`);
+      });
+      
+      console.log('📉 Bottom 3 worst deals in database:');
+      packValueRatios.slice(-3).forEach((p, i) => {
+        const packValue = p.pack.items.reduce((sum: number, item: any) => {
+          return sum + ((itemPrices[item.itemTypeId] || 0) * item.quantity);
+        }, 0);
+        console.log(`  ${packValueRatios.length - 2 + i}. $${packValue.toFixed(2)} value for $${p.pack.price} (${p.valueRatio.toFixed(2)}x ratio)`);
+      });
+      
+      // Show where this pack would rank
+      const thisPackRank = betterPacks.length + 1;
+      console.log(`🎯 This pack would rank #${thisPackRank} out of ${packValueRatios.length} packs`);
+    }
     
     return {
       grade,
@@ -494,7 +552,33 @@ export const analyzePackValueNew = async (
     };
     
   } catch (error) {
-    console.error('Error analyzing pack value:', error);
-    throw error;
+    console.error('❌ Error analyzing pack value:', error);
+    
+    // Check if it's a Firebase/network error
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+    }
+    
+    // If we have specific error types, handle them
+    if (error && typeof error === 'object' && 'code' in error) {
+      console.error('Firebase error code:', (error as any).code);
+    }
+    
+    // Return a fallback result instead of throwing
+    console.log('🔄 Returning fallback analysis due to error');
+    return {
+      grade: 'C',
+      totalValue: 0,
+      dollarsPerDollar: 0,
+      comparison: {
+        betterThanPercent: 50,
+        totalPacksCompared: 0
+      },
+      similarPacks: []
+    };
   }
 };

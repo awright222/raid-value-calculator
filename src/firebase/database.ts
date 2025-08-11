@@ -201,16 +201,16 @@ export const addPackWithValidation = async (
 
 // Get all packs from Firestore with enhanced error handling and fallback strategies
 export const getAllPacks = async (): Promise<FirebasePack[]> => {
-  console.log('🔥 Firebase Database: Starting getAllPacks()');
+  console.log('🔥 Firebase Database: Starting getAllPacks() - SIMPLIFIED VERSION');
   
-  // Strategy 1: Try the standard query with orderBy
   try {
-    console.log('� Firebase Database: Attempting standard query with orderBy');
+    console.log('🔥 Firebase Database: Attempting BASIC collection read (no complex queries)');
     
-    const q = query(collection(db, 'packs'), orderBy('created_at', 'desc'));
-    const querySnapshot = await getDocs(q);
+    // Use the most basic possible Firestore read - no orderBy, no query constraints
+    const collectionRef = collection(db, 'packs');
+    const querySnapshot = await getDocs(collectionRef);
     
-    console.log(`🔥 Firebase Database: Standard query succeeded, ${querySnapshot.docs.length} documents found`);
+    console.log(`🔥 Firebase Database: Basic read successful, ${querySnapshot.docs.length} documents found`);
     
     const packs = querySnapshot.docs.map(doc => {
       const data = doc.data();
@@ -219,88 +219,25 @@ export const getAllPacks = async (): Promise<FirebasePack[]> => {
         ...data,
         created_at: data.created_at instanceof Timestamp ? data.created_at : Timestamp.now()
       } as FirebasePack;
+    }).sort((a, b) => {
+      // Sort manually in memory instead of using Firestore orderBy
+      const aTime = a.created_at instanceof Timestamp ? a.created_at.seconds : 0;
+      const bTime = b.created_at instanceof Timestamp ? b.created_at.seconds : 0;
+      return bTime - aTime; // Newest first
     });
     
     console.log(`🔥 Firebase Database: Successfully processed ${packs.length} packs`);
     return packs;
-  } catch (orderByError: any) {
-    console.warn('🔥 Firebase Database: OrderBy query failed, trying fallback strategies', {
-      name: orderByError.name,
-      code: orderByError.code,
-      message: orderByError.message
+    
+  } catch (error: any) {
+    console.error('❌ Firebase Database: Even basic read failed:', {
+      name: error.name,
+      code: error.code,
+      message: error.message
     });
     
-    // Strategy 2: Try simple query without orderBy (in case of missing index)
-    try {
-      console.log('🔥 Firebase Database: Attempting simple query without orderBy');
-      
-      const simpleQuery = query(collection(db, 'packs'), limit(100));
-      const querySnapshot = await getDocs(simpleQuery);
-      
-      console.log(`🔥 Firebase Database: Simple query succeeded, ${querySnapshot.docs.length} documents found`);
-      
-      const packs = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          created_at: data.created_at instanceof Timestamp ? data.created_at : Timestamp.now()
-        } as FirebasePack;
-      }).sort((a, b) => b.created_at.seconds - a.created_at.seconds); // Sort manually
-      
-      console.log(`🔥 Firebase Database: Fallback query successful, returning ${packs.length} packs`);
-      return packs;
-    } catch (simpleError: any) {
-      console.warn('🔥 Firebase Database: Simple query also failed, trying basic collection read', {
-        name: simpleError.name,
-        code: simpleError.code,
-        message: simpleError.message
-      });
-      
-      // Strategy 3: Try basic collection read without any query constraints
-      try {
-        console.log('🔥 Firebase Database: Attempting basic collection read');
-        
-        const collectionRef = collection(db, 'packs');
-        const querySnapshot = await getDocs(collectionRef);
-        
-        console.log(`🔥 Firebase Database: Basic collection read succeeded, ${querySnapshot.docs.length} documents found`);
-        
-        const packs = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            created_at: data.created_at instanceof Timestamp ? data.created_at : Timestamp.now()
-          } as FirebasePack;
-        }).sort((a, b) => b.created_at.seconds - a.created_at.seconds);
-        
-        console.log(`🔥 Firebase Database: Basic read successful, returning ${packs.length} packs`);
-        return packs;
-      } catch (basicError: any) {
-        console.error('🔥 Firebase Database: All query strategies failed', {
-          orderByError: {
-            name: orderByError.name,
-            code: orderByError.code,
-            message: orderByError.message
-          },
-          simpleError: {
-            name: simpleError.name,
-            code: simpleError.code,
-            message: simpleError.message
-          },
-          basicError: {
-            name: basicError.name,
-            code: basicError.code,
-            message: basicError.message
-          }
-        });
-        
-        // Final fallback: return empty array to prevent app crash
-        console.log('🔥 Firebase Database: Returning empty array as final fallback');
-        return [];
-      }
-    }
+    // Return empty array to prevent app crash
+    return [];
   }
 };
 

@@ -36,6 +36,10 @@ function generateSessionId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+// Add a simple test log
+console.log('[VIDEO ANALYTICS] VideoAnalytics module loaded');
+console.warn('[VIDEO ANALYTICS] VideoAnalytics module loaded');
+
 // Track video analytics event
 export const trackVideoEvent = async (
   event: VideoAnalytics['event'],
@@ -43,11 +47,15 @@ export const trackVideoEvent = async (
   duration?: number
 ): Promise<void> => {
   try {
+    console.log('� Video analytics:', event, { currentTime, duration });
+    console.warn('[VIDEO ANALYTICS] Attempting to track video event:', event, { currentTime, duration });
+    
     // Get or create session ID
     let sessionId = sessionStorage.getItem('video_session_id');
     if (!sessionId) {
       sessionId = generateSessionId();
       sessionStorage.setItem('video_session_id', sessionId);
+      console.log('[VIDEO ANALYTICS] Created new session ID:', sessionId);
     }
 
     const watchPercentage = duration && currentTime ? (currentTime / duration) * 100 : undefined;
@@ -63,24 +71,41 @@ export const trackVideoEvent = async (
       referrer: document.referrer || 'direct'
     };
 
-    await addDoc(collection(db, 'video_analytics'), analyticsData);
-    console.log(`Video analytics tracked: ${event}`, { currentTime, duration, watchPercentage });
+    console.log('[VIDEO ANALYTICS] Tracking data:', analyticsData);
+    
+    const docRef = await addDoc(collection(db, 'video_analytics'), analyticsData);
+    console.log('[VIDEO ANALYTICS] Successfully tracked:', event, '(Doc ID:', docRef.id, ')');
+    console.warn('[VIDEO ANALYTICS] Successfully tracked:', event, '(Doc ID:', docRef.id, ')');
   } catch (error) {
-    console.error('Failed to track video analytics:', error);
+    console.error('[VIDEO ANALYTICS] Failed to track video analytics:', error);
+    console.warn('[VIDEO ANALYTICS] Failed to track video analytics:', error);
+    // Log detailed error info
+    if (error instanceof Error) {
+      console.error('[VIDEO ANALYTICS] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+    }
   }
 };
 
 // Get video analytics statistics
 export const getVideoStats = async (): Promise<VideoStats> => {
   try {
+    console.log('🎬 Fetching video analytics...');
     const analyticsRef = collection(db, 'video_analytics');
     const q = query(analyticsRef, orderBy('timestamp', 'desc'), limit(1000));
     const snapshot = await getDocs(q);
+    
+    console.log(`🎬 Found ${snapshot.docs.length} analytics records`);
     
     const events = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as VideoAnalytics[];
+
+    console.log('🎬 Sample events:', events.slice(0, 3));
 
     // Group events by session
     const sessionMap = new Map<string, VideoAnalytics[]>();
