@@ -5,7 +5,6 @@ import { calculateItemPrices, clearPricingCache } from '../services/pricingServi
 import { maybeCreateMarketSnapshot } from '../services/marketTrackingService';
 import { useAnalytics } from '../services/analytics';
 import { ITEM_TYPES, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice } from '../types/itemTypes';
-import ConfidenceIndicator from './ConfidenceIndicator';
 
 interface ItemValue {
   itemTypeId: string;
@@ -15,7 +14,6 @@ interface ItemValue {
   utilityAdjustedPrice: number;
   utilityScore: number;
   totalQuantity: number;
-  packCount: number;
 }
 
 export default function ItemValues() {
@@ -63,8 +61,7 @@ export default function ItemValues() {
           averagePrice,
           utilityAdjustedPrice,
           utilityScore,
-          totalQuantity: stats.totalQuantity,
-          packCount: stats.packCount
+          totalQuantity: stats.totalQuantity
         };
       }).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
@@ -306,11 +303,6 @@ export default function ItemValues() {
                       </>
                     );
                   })()}
-                  <ConfidenceIndicator 
-                    totalQuantity={item.totalQuantity}
-                    packCount={item.packCount}
-                    className="justify-end"
-                  />
                 </div>
               </div>
             </motion.div>
