@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import { Timestamp } from 'firebase/firestore';
 import { useTheme } from '../contexts/ThemeContext';
 import { calculateItemPrices } from '../services/pricingService';
+import { useAnalytics } from '../services/analytics';
 import { 
-  getLatestMarketTrends, 
+  getLatestMarketTrends,
   type MarketTrend 
 } from '../firebase/historical';
 import MarketBestDeals from './MarketBestDeals';
@@ -26,11 +27,23 @@ function FlipCard({ item, index }: FlipCardProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [isFlipped, setIsFlipped] = useState(false);
+  const analytics = useAnalytics();
   
-  // Calculate price trend
-  const priceChange = item.priceHistory.length >= 2 
-    ? ((item.currentPrice - item.priceHistory[item.priceHistory.length - 2].price) / item.priceHistory[item.priceHistory.length - 2].price) * 100
+  // Calculate price trend based on visible data (last 3 days shown on flip card)
+  const visibleHistory = item.priceHistory.slice(-3); // Last 3 days (what user sees on flip)
+  const priceChange = visibleHistory.length >= 2 
+    ? ((visibleHistory[visibleHistory.length - 1].price - visibleHistory[0].price) / visibleHistory[0].price) * 100
     : 0;
+  
+  // Debug logging for confusing trends
+  if (Math.abs(priceChange) > 10) {
+    console.log(`🔍 ${item.itemName} trend debug:`, {
+      priceChange: `${priceChange.toFixed(1)}%`,
+      firstPrice: `${item.priceHistory[0]?.date}: $${item.priceHistory[0]?.price.toFixed(4)}`,
+      lastPrice: `${item.priceHistory[item.priceHistory.length - 1]?.date}: $${item.priceHistory[item.priceHistory.length - 1]?.price.toFixed(4)}`,
+      allPrices: item.priceHistory.map(p => `${p.date}: $${p.price.toFixed(4)}`)
+    });
+  }
   
   const trendColor = priceChange > 0 ? 'text-green-500' : priceChange < 0 ? 'text-red-500' : 'text-gray-500';
   const trendDirection = priceChange > 0 ? '↗' : priceChange < 0 ? '↘' : '→';
@@ -52,7 +65,17 @@ function FlipCard({ item, index }: FlipCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
       className="flip-card w-full h-64"
-      onClick={() => setIsFlipped(!isFlipped)}
+      onClick={() => {
+        const newFlipped = !isFlipped;
+        analytics.trackEngagement('market_trends_flip', {
+          itemName: item.itemName,
+          flippedTo: newFlipped ? 'details' : 'chart',
+          currentPrice: item.currentPrice,
+          trend: item.priceHistory.length >= 2 ? 
+            (item.priceHistory[item.priceHistory.length - 1].price > item.priceHistory[item.priceHistory.length - 2].price ? 'up' : 'down') : 'stable'
+        });
+        setIsFlipped(newFlipped);
+      }}
     >
       <motion.div
         className="flip-card-inner"
@@ -122,7 +145,7 @@ function FlipCard({ item, index }: FlipCardProps) {
           </div>
           
           {/* Mini Chart */}
-          <div className="mb-4">
+          <div className="mb-6">
             <svg width="100%" height="80" className="overflow-visible">
               {pathData && (
                 <>
@@ -179,194 +202,6 @@ function FlipCard({ item, index }: FlipCardProps) {
   );
 }
 
-
-function BestDeals({ marketTrends, isDark }: { marketTrends: MarketTrend[]; isDark: boolean }) {
-  const weeklyTrend = marketTrends.find(t => t.period === 'weekly');
-  const monthlyTrend = marketTrends.find(t => t.period === 'monthly');
-
-  if (marketTrends.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className={`mb-8 p-6 rounded-lg border text-center ${
-          isDark 
-            ? 'bg-gradient-to-r from-orange-900/20 to-red-900/20 border-orange-700/30' 
-            : 'bg-gradient-to-r from-orange-50 to-red-50 border-orange-200'
-        }`}
-      >
-        <h2 className={`text-xl font-semibold mb-2 ${
-          isDark ? 'text-white' : 'text-gray-900'
-        }`}>
-          🏆 Best Deals
-        </h2>
-        <p className={`text-sm ${
-          isDark ? 'text-gray-400' : 'text-gray-600'
-        }`}>
-          No market trends data available yet. Analyze some packs to see best deals!
-        </p>
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className={`mb-8 p-6 rounded-lg border ${
-        isDark 
-          ? 'bg-gradient-to-r from-orange-900/20 to-yellow-900/20 border-orange-700/30' 
-          : 'bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200'
-      }`}
-    >
-      <h2 className={`text-xl font-semibold mb-6 flex items-center gap-2 ${
-        isDark ? 'text-white' : 'text-gray-900'
-      }`}>
-        🏆 Best Deals
-        <span className={`text-sm font-normal ${
-          isDark ? 'text-gray-400' : 'text-gray-600'
-        }`}>
-          • Updates weekly & monthly
-        </span>
-      </h2>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly Best Deal */}
-        {weeklyTrend && (
-          <div className={`p-4 rounded-lg border-2 ${
-            isDark 
-              ? 'bg-gradient-to-br from-green-900/30 to-emerald-900/30 border-green-600/50' 
-              : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300'
-          }`}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                isDark ? 'bg-green-700 text-green-100' : 'bg-green-200 text-green-800'
-              }`}>
-                THIS WEEK
-              </div>
-              <div className={`text-sm ${
-                isDark ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                {weeklyTrend.periodStart.toDate().toLocaleDateString()} - {weeklyTrend.periodEnd.toDate().toLocaleDateString()}
-              </div>
-            </div>
-            
-            <h3 className={`text-lg font-bold mb-2 ${
-              isDark ? 'text-white' : 'text-gray-900'
-            }`}>
-              {weeklyTrend.bestDeal.packName}
-            </h3>
-            
-            <div className="flex items-center gap-4 mb-3">
-              <div className={`px-3 py-1 rounded-lg font-bold text-lg ${
-                weeklyTrend.bestDeal.grade === 'S' ? 'bg-purple-600 text-white' :
-                weeklyTrend.bestDeal.grade === 'A' ? 'bg-green-600 text-white' :
-                weeklyTrend.bestDeal.grade === 'B' ? 'bg-blue-600 text-white' :
-                weeklyTrend.bestDeal.grade === 'C' ? 'bg-yellow-600 text-white' :
-                weeklyTrend.bestDeal.grade === 'D' ? 'bg-orange-600 text-white' :
-                'bg-red-600 text-white'
-              }`}>
-                Grade {weeklyTrend.bestDeal.grade}
-              </div>
-              
-              <div className={`text-sm ${
-                isDark ? 'text-gray-300' : 'text-gray-700'
-              }`}>
-                ${weeklyTrend.bestDeal.costPerEnergy.toFixed(4)} per energy
-              </div>
-            </div>
-
-            <div className={`text-xs ${
-              isDark ? 'text-gray-400' : 'text-gray-600'
-            }`}>
-              From {weeklyTrend.totalPacksAnalyzed} packs analyzed this week
-            </div>
-          </div>
-        )}
-
-        {/* Monthly Best Deal */}
-        {monthlyTrend && (
-          <div className={`p-4 rounded-lg border-2 ${
-            isDark 
-              ? 'bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border-blue-600/50' 
-              : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300'
-          }`}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                isDark ? 'bg-blue-700 text-blue-100' : 'bg-blue-200 text-blue-800'
-              }`}>
-                THIS MONTH
-              </div>
-              <div className={`text-sm ${
-                isDark ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                {monthlyTrend.periodStart.toDate().toLocaleDateString()} - {monthlyTrend.periodEnd.toDate().toLocaleDateString()}
-              </div>
-            </div>
-            
-            <h3 className={`text-lg font-bold mb-2 ${
-              isDark ? 'text-white' : 'text-gray-900'
-            }`}>
-              {monthlyTrend.bestDeal.packName}
-            </h3>
-            
-            <div className="flex items-center gap-4 mb-3">
-              <div className={`px-3 py-1 rounded-lg font-bold text-lg ${
-                monthlyTrend.bestDeal.grade === 'S' ? 'bg-purple-600 text-white' :
-                monthlyTrend.bestDeal.grade === 'A' ? 'bg-green-600 text-white' :
-                monthlyTrend.bestDeal.grade === 'B' ? 'bg-blue-600 text-white' :
-                monthlyTrend.bestDeal.grade === 'C' ? 'bg-yellow-600 text-white' :
-                monthlyTrend.bestDeal.grade === 'D' ? 'bg-orange-600 text-white' :
-                'bg-red-600 text-white'
-              }`}>
-                Grade {monthlyTrend.bestDeal.grade}
-              </div>
-              
-              <div className={`text-sm ${
-                isDark ? 'text-gray-300' : 'text-gray-700'
-              }`}>
-                ${monthlyTrend.bestDeal.costPerEnergy.toFixed(4)} per energy
-              </div>
-            </div>
-
-            <div className={`text-xs ${
-              isDark ? 'text-gray-400' : 'text-gray-600'
-            }`}>
-              From {monthlyTrend.totalPacksAnalyzed} packs analyzed this month
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Market Trends Summary */}
-      {(weeklyTrend || monthlyTrend) && (
-        <div className={`mt-4 p-3 rounded-lg ${
-          isDark ? 'bg-gray-800/50' : 'bg-gray-100/50'
-        }`}>
-          <div className="text-xs space-y-1">
-            {weeklyTrend && (
-              <div className={`${
-                isDark ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                📈 Weekly trend: {weeklyTrend.trendDirection} (avg grade: {weeklyTrend.averageGrade})
-              </div>
-            )}
-            {monthlyTrend && (
-              <div className={`${
-                isDark ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                📊 Monthly trend: {monthlyTrend.trendDirection} (avg grade: {monthlyTrend.averageGrade})
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
 export default function MarketTrends() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -375,6 +210,7 @@ export default function MarketTrends() {
   const [error, setError] = useState<string | null>(null);
   const [actualTotalPacks, setActualTotalPacks] = useState<number>(0);
   const [marketTrends, setMarketTrends] = useState<MarketTrend[]>([]);
+  const analytics = useAnalytics();
 
   // Helper function to create market trends from pack data
   const createTrendFromPacks = async (packs: any[], period: 'weekly' | 'monthly'): Promise<MarketTrend | null> => {
@@ -468,6 +304,10 @@ export default function MarketTrends() {
 
   useEffect(() => {
     loadMarketData();
+    // Track Market Trends page view
+    analytics.trackPageView('market_trends', {
+      feature: 'price_analysis'
+    });
   }, []);
 
   const loadMarketData = async () => {
@@ -532,8 +372,25 @@ export default function MarketTrends() {
       setActualTotalPacks(totalPacks);
       setMarketTrends(marketTrendsData);
       
-      // Create price trends with realistic historical data
-      const trends: ItemPriceTrend[] = Object.entries(itemPrices).map(([itemTypeId, currentPrice]) => {
+      // Create price trends with REAL historical data from pack submissions
+      console.log('📊 MarketTrends: Building historical trends from pack data...');
+      const trends: ItemPriceTrend[] = [];
+      
+      // Get all packs from the last 30 days to build real historical data
+      const { getAllPacks } = await import('../firebase/database');
+      const allPacks = await getAllPacks();
+      
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentPacks = allPacks.filter(pack => {
+        const packDate = pack.created_at?.toDate() || new Date(0);
+        return packDate >= thirtyDaysAgo && pack.items && pack.items.length > 0;
+      });
+      
+      console.log(`📦 MarketTrends: Using ${recentPacks.length} recent packs for historical analysis`);
+      
+      for (const [itemTypeId, currentPrice] of Object.entries(itemPrices)) {
         // Get proper item names
         let itemName = itemTypeId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
         
@@ -545,33 +402,69 @@ export default function MarketTrends() {
         else if (itemTypeId === 'ancient_shard') itemName = 'Ancient Shard';
         else if (itemTypeId === 'mystery_shard') itemName = 'Mystery Shard';
         
-        // Generate realistic price history (simulate 7 days of data)
+        // Find packs containing this item and build historical pricing
+        const packsWithItem = recentPacks.filter(pack => 
+          pack.items && pack.items.some((item: any) => item.itemTypeId === itemTypeId)
+        );
+        
+        console.log(`� ${itemName}: Found in ${packsWithItem.length} packs over last 30 days`);
+        
+        // Build daily price history for the last 7 days
         const priceHistory = [];
-        const basePrice = currentPrice;
+        const today = new Date();
         
         for (let i = 6; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
+          const targetDate = new Date(today);
+          targetDate.setDate(today.getDate() - i);
           
-          // Add some realistic price variation (±15%)
-          const variation = (Math.random() - 0.5) * 0.3; // ±15%
-          const historicalPrice = basePrice * (1 + variation);
+          // Find packs from this day (±12 hours)
+          const dayStart = new Date(targetDate);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(targetDate);
+          dayEnd.setHours(23, 59, 59, 999);
+          
+          const dayPacks = packsWithItem.filter(pack => {
+            const packDate = pack.created_at?.toDate();
+            return packDate && packDate >= dayStart && packDate <= dayEnd;
+          });
+          
+          let dayPrice = currentPrice; // Default to current price
+          
+          if (dayPacks.length > 0) {
+            // Calculate average price for this day using the same pricing logic
+            const dayItemCosts = dayPacks.map(pack => {
+              if (!pack.items) return 0;
+              const item = pack.items.find((item: any) => item.itemTypeId === itemTypeId);
+              const itemQuantity = item?.quantity || 1;
+              // Rough estimate: distribute pack price by item quantities
+              const totalItems = pack.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+              return (pack.price * itemQuantity) / totalItems;
+            });
+            
+            if (dayItemCosts.length > 0 && dayPacks[0].items) {
+              const firstPackItem = dayPacks[0].items.find((item: any) => item.itemTypeId === itemTypeId);
+              const itemQuantity = firstPackItem?.quantity || 1;
+              dayPrice = dayItemCosts.reduce((sum, cost) => sum + cost, 0) / dayItemCosts.length / itemQuantity;
+            }
+          }
           
           priceHistory.push({
-            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), // Shorter format: "Aug 10"
-            price: Math.max(0.0001, historicalPrice), // Ensure positive prices
-            confidence: 85 + Math.random() * 15 // 85-100% confidence
+            date: targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            price: Math.max(0.0001, dayPrice),
+            confidence: dayPacks.length > 0 ? Math.min(95, dayPacks.length * 20) : 50
           });
         }
         
-        return {
+        console.log(`📊 ${itemName} price history:`, priceHistory.map(p => `${p.date}: $${p.price.toFixed(4)}`).join(', '));
+        
+        trends.push({
           itemName,
           currentPrice,
           priceHistory,
           totalPacks: 0, // Not displaying pack count anymore
           confidence: 0  // Not displaying confidence anymore
-        };
-      });
+        });
+      }
       
       // Sort by price descending to show most valuable items first
       trends.sort((a, b) => b.currentPrice - a.currentPrice);
@@ -661,15 +554,29 @@ export default function MarketTrends() {
             </div>
             <div className="text-sm">Items Tracked</div>
           </div>
-          <div className={`text-center ${
+          <div className={`text-center relative group ${
             isDark ? 'text-gray-300' : 'text-gray-700'
           }`}>
-            <div className={`text-2xl font-bold ${
+            <div className={`text-2xl font-bold cursor-help ${
               isDark ? 'text-green-400' : 'text-green-600'
             }`}>
               ${itemTrends.length > 0 ? itemTrends[0].currentPrice.toFixed(4) : '0.0000'}
             </div>
             <div className="text-sm">Highest Value Item</div>
+            
+            {/* Tooltip */}
+            {itemTrends.length > 0 && (
+              <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 whitespace-nowrap ${
+                isDark 
+                  ? 'bg-gray-800 text-white border border-gray-600' 
+                  : 'bg-white text-gray-800 border border-gray-200 shadow-lg'
+              }`}>
+                {itemTrends[0].itemName}
+                <div className={`absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${
+                  isDark ? 'border-t-gray-800' : 'border-t-white'
+                }`}></div>
+              </div>
+            )}
           </div>
           <div className={`text-center ${
             isDark ? 'text-gray-300' : 'text-gray-700'

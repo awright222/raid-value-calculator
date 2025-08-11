@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getAllPacks } from '../firebase/database';
+import { useAnalytics } from '../services/analytics';
 import { getItemTypeById } from '../types/itemTypes';
 import GradeDisplay from './GradeDisplay';
 
@@ -20,9 +21,14 @@ export default function BestDeals() {
   const [bestPacks, setBestPacks] = useState<PackWithValue[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'savings' | 'percentage' | 'recent'>('percentage');
+  const analytics = useAnalytics();
 
   useEffect(() => {
     loadBestDeals();
+    // Track page view for best deals
+    analytics.trackPageView('best_deals', {
+      feature: 'deals_discovery'
+    });
   }, []);
 
   const loadBestDeals = async () => {
@@ -216,7 +222,15 @@ export default function BestDeals() {
           
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'savings' | 'percentage' | 'recent')}
+            onChange={(e) => {
+              const newSortBy = e.target.value as 'savings' | 'percentage' | 'recent';
+              analytics.trackEngagement('best_deals_sort', {
+                oldSort: sortBy,
+                newSort: newSortBy,
+                dealsCount: bestPacks.length
+              });
+              setSortBy(newSortBy);
+            }}
             className="glass-input rounded-xl px-4 py-2 min-w-[150px]"
           >
             <option value="percentage">Best % Savings</option>

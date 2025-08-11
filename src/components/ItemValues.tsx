@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { savePriceSnapshot } from '../firebase/historical';
 import { calculateItemPrices, clearPricingCache } from '../services/pricingService';
+import { maybeCreateMarketSnapshot } from '../services/marketTrackingService';
+import { useAnalytics } from '../services/analytics';
 import { ITEM_TYPES, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice } from '../types/itemTypes';
 import ConfidenceIndicator from './ConfidenceIndicator';
 
@@ -24,6 +26,7 @@ export default function ItemValues() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [totalPacks, setTotalPacks] = useState<number>(0);
   const [showUtilityAdjusted, setShowUtilityAdjusted] = useState(false);
+  const analytics = useAnalytics();
 
   useEffect(() => {
     loadItemValues();
@@ -85,6 +88,9 @@ export default function ItemValues() {
           
           await savePriceSnapshot(priceData);
           console.log('Historical price snapshot saved');
+          
+          // Create market snapshot if needed (for long-term tracking)
+          await maybeCreateMarketSnapshot('item_values_refresh');
         } catch (error) {
           console.warn('Failed to save price snapshot:', error);
         }
@@ -98,6 +104,14 @@ export default function ItemValues() {
   };
 
   const handleRefresh = () => {
+    // Track user engagement with item values refresh
+    analytics.trackEngagement('item_values_refresh', {
+      totalItems: itemValues.length,
+      selectedCategory,
+      showUtilityAdjusted,
+      totalPacksAnalyzed: totalPacks
+    });
+    
     clearPricingCache(); // Clear cache to force fresh calculation
     loadItemValues(true);
   };
@@ -201,7 +215,15 @@ export default function ItemValues() {
             <div className="flex items-center space-x-2 text-sm">
               <span className="text-secondary-600">Utility Adjusted:</span>
               <button
-                onClick={() => setShowUtilityAdjusted(!showUtilityAdjusted)}
+                onClick={() => {
+                  const newValue = !showUtilityAdjusted;
+                  analytics.trackEngagement('utility_adjustment_toggle', {
+                    enabled: newValue,
+                    itemCount: itemValues.length,
+                    category: selectedCategory
+                  });
+                  setShowUtilityAdjusted(newValue);
+                }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   showUtilityAdjusted ? 'bg-primary-600' : 'bg-gray-300'
                 }`}
@@ -227,7 +249,15 @@ export default function ItemValues() {
             
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => {
+                const newCategory = e.target.value;
+                analytics.trackEngagement('item_category_filter', {
+                  oldCategory: selectedCategory,
+                  newCategory,
+                  totalItems: itemValues.length
+                });
+                setSelectedCategory(newCategory);
+              }}
               className="glass-input rounded-xl px-4 py-2 min-w-[150px]"
             >
               <option value="all">All Categories</option>

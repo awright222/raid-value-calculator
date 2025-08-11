@@ -226,13 +226,13 @@ export default function ItemAutocomplete({
 
               {/* Results with improved styling */}
               <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900">
-                <div className="h-full overflow-y-auto">
+                <div className="h-full overflow-y-auto overscroll-contain" style={{ maxHeight: 'calc(85vh - 200px)' }}>
                   <div ref={listRef} className="p-4">
                     {filteredItems.length > 0 ? (
                       Object.entries(groupedItems).map(([categoryName, categoryItems]) => (
                         <div key={categoryName} className="mb-6 last:mb-4">
-                          {/* Enhanced Category separator */}
-                          <div className="sticky top-0 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 backdrop-blur-sm px-4 py-3 mb-3 border border-gray-200 dark:border-gray-600 rounded-xl shadow-sm">
+                          {/* Enhanced Category separator - removed sticky positioning */}
+                          <div className="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 backdrop-blur-sm px-4 py-3 mb-3 border border-gray-200 dark:border-gray-600 rounded-xl shadow-sm">
                             <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-2">
                               <div className="w-3 h-3 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full"></div>
                               {categoryName}

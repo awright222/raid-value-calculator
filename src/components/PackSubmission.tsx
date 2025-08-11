@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ITEM_CATEGORIES, getItemTypesByCategory, getItemTypeById } from '../types/itemTypes';
+import { useAnalytics } from '../services/analytics';
 import RateLimitInfo from './RateLimitInfo';
 import ItemAutocomplete from './ItemAutocomplete';
 
@@ -28,6 +29,7 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
   const [useAutocomplete, setUseAutocomplete] = useState(true); // Default to autocomplete
+  const analytics = useAnalytics();
 
   // Calculate totals from items
   const energyPots = formData.items.find(item => item.itemTypeId === 'energy_pot')?.quantity || 0;
@@ -113,6 +115,25 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       };
       
       const result = await submitPendingPack(packData, userId, submitterEmail || '');
+      
+      // Track pack submission analytics
+      analytics.trackConversion('pack_submit', {
+        packName: formData.name.trim(),
+        priceRange: formData.price < 5 ? '$0-5' : 
+                   formData.price < 10 ? '$5-10' :
+                   formData.price < 25 ? '$10-25' :
+                   formData.price < 50 ? '$25-50' :
+                   formData.price < 100 ? '$50-100' : '$100+',
+        energyRange: totalEnergy < 500 ? '0-500' :
+                    totalEnergy < 1000 ? '500-1K' :
+                    totalEnergy < 2500 ? '1K-2.5K' :
+                    totalEnergy < 5000 ? '2.5K-5K' : '5K+',
+        itemCount: formData.items.length,
+        hasEnergyPots: energyPots > 0,
+        hasRawEnergy: rawEnergy > 0,
+        costPerEnergy: costPerEnergy,
+        submissionResult: result.success ? 'success' : 'failed'
+      });
       
       if (result.success) {
         setSubmitMessage({ 

@@ -9,6 +9,7 @@ import { createFirebaseDebugger } from '../utils/firebaseDebugger';
 import { diagnosePricingServiceIssue } from '../utils/itemValuesDiagnostic';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
+import { MarketTrackingPanel } from './MarketTrackingPanel';
 import ItemAutocomplete from './ItemAutocomplete';
 import type { PendingPack } from '../utils/duplicateDetection';
 
@@ -17,7 +18,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'debug' | 'utility'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'tracking' | 'debug' | 'utility'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -93,7 +94,8 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
     { id: 'debug', label: 'Debug', icon: '🔧', description: 'Firebase diagnostics' },
     { id: 'analytics', label: 'Analytics', icon: '📈', description: 'User engagement & traffic stats' },
-    { id: 'intelligence', label: 'Pack Intelligence', icon: '📊', description: 'Market analysis & pack evolution' },
+    { id: 'tracking', label: 'Price Tracking', icon: '📊', description: 'Long-term market analysis' },
+    { id: 'intelligence', label: 'Pack Intelligence', icon: '🧠', description: 'Market analysis & pack evolution' },
     { id: 'utility', label: 'Item Values', icon: '⚖️', description: 'Manage item utility scores' },
     { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
     { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
@@ -927,6 +929,22 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
             </div>
             
             <AnalyticsDashboard />
+          </div>
+        )}
+
+        {/* Price Tracking Tab */}
+        {activeAdminTab === 'tracking' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Market Price Tracking
+              </h2>
+              <p className="text-secondary-600">
+                Long-term price history and market trend analysis for year-end insights
+              </p>
+            </div>
+            
+            <MarketTrackingPanel isDark={false} />
           </div>
         )}
 

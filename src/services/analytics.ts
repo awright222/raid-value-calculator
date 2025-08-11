@@ -168,6 +168,21 @@ class PrivacyAnalytics {
     totalVisits: number;
     popularPacks: Array<{ name: string; views: number }>;
     peakHours: Array<{ hour: number; activity: number }>;
+    engagementData: {
+      totalEngagements: number;
+      topEngagements: Array<{ action: string; count: number }>;
+      priceRangeInterest: Record<string, number>;
+      categoryPreferences: Record<string, number>;
+    };
+    conversionData: {
+      totalConversions: number;
+      conversionsByType: Record<string, number>;
+      packSubmissions: {
+        total: number;
+        successRate: number;
+        priceRangeDistribution: Record<string, number>;
+      };
+    };
   }> {
     return new Promise((resolve) => {
       try {
@@ -210,11 +225,71 @@ class PrivacyAnalytics {
           .sort((a, b) => b.activity - a.activity)
           .slice(0, 6);
 
+        // Analyze engagement data
+        const engagements = events.filter((e: any) => e.eventType === 'user_engagement');
+        const engagementCounts: Record<string, number> = {};
+        const priceRangeInterest: Record<string, number> = {};
+        const categoryPreferences: Record<string, number> = {};
+
+        engagements.forEach((event: any) => {
+          const action = event.data.action;
+          engagementCounts[action] = (engagementCounts[action] || 0) + 1;
+          
+          if (event.data.priceRange) {
+            priceRangeInterest[event.data.priceRange] = (priceRangeInterest[event.data.priceRange] || 0) + 1;
+          }
+          
+          if (event.data.selectedCategory || event.data.newCategory) {
+            const category = event.data.selectedCategory || event.data.newCategory;
+            categoryPreferences[category] = (categoryPreferences[category] || 0) + 1;
+          }
+        });
+
+        // Analyze conversion data
+        const conversions = events.filter((e: any) => e.eventType === 'conversion');
+        const conversionsByType: Record<string, number> = {};
+        const packSubmissionPriceRanges: Record<string, number> = {};
+        let packSubmissionTotal = 0;
+        let packSubmissionSuccess = 0;
+
+        conversions.forEach((event: any) => {
+          const type = event.data.conversionType;
+          conversionsByType[type] = (conversionsByType[type] || 0) + 1;
+          
+          if (type === 'pack_submit') {
+            packSubmissionTotal++;
+            if (event.data.submissionResult === 'success') {
+              packSubmissionSuccess++;
+            }
+            if (event.data.priceRange) {
+              packSubmissionPriceRanges[event.data.priceRange] = (packSubmissionPriceRanges[event.data.priceRange] || 0) + 1;
+            }
+          }
+        });
+
         resolve({
           uniqueUsers: sessions.size,
           totalVisits: pageViews.length,
           popularPacks,
-          peakHours
+          peakHours,
+          engagementData: {
+            totalEngagements: engagements.length,
+            topEngagements: Object.entries(engagementCounts)
+              .map(([action, count]) => ({ action, count }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 10),
+            priceRangeInterest,
+            categoryPreferences
+          },
+          conversionData: {
+            totalConversions: conversions.length,
+            conversionsByType,
+            packSubmissions: {
+              total: packSubmissionTotal,
+              successRate: packSubmissionTotal > 0 ? (packSubmissionSuccess / packSubmissionTotal) * 100 : 0,
+              priceRangeDistribution: packSubmissionPriceRanges
+            }
+          }
         });
       } catch (error) {
         console.warn('Failed to generate analytics summary:', error);
@@ -222,7 +297,22 @@ class PrivacyAnalytics {
           uniqueUsers: 0,
           totalVisits: 0,
           popularPacks: [],
-          peakHours: []
+          peakHours: [],
+          engagementData: {
+            totalEngagements: 0,
+            topEngagements: [],
+            priceRangeInterest: {},
+            categoryPreferences: {}
+          },
+          conversionData: {
+            totalConversions: 0,
+            conversionsByType: {},
+            packSubmissions: {
+              total: 0,
+              successRate: 0,
+              priceRangeDistribution: {}
+            }
+          }
         });
       }
     });
