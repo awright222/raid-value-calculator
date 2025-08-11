@@ -6,6 +6,7 @@ import ItemValues from './components/ItemValues';
 import CommunityTab from './components/CommunityTab';
 import MarketTrends from './components/MarketTrends';
 import ContactTab from './components/ContactTab';
+import DemoModal from './components/DemoModal';
 import Header from './components/Header';
 import LoginModal from './components/LoginModal';
 import { BiometricLogin } from './components/BiometricLogin';
@@ -17,6 +18,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'community' | 'trends' | 'contact' | 'admin'>('analyze');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBiometricLogin, setShowBiometricLogin] = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showAdminTab, setShowAdminTab] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -119,6 +121,7 @@ function App() {
         <Header 
           isAdminAuthenticated={isAdminAuthenticated} 
           onLogout={handleAdminLogout}
+          onShowDemo={() => setShowDemoModal(true)}
         />
         
         {/* Analytics Tracking */}
@@ -232,6 +235,12 @@ function App() {
             setShowBiometricLogin(true);
           }}
           error={loginError}
+        />
+
+        {/* Demo Video Modal */}
+        <DemoModal
+          isOpen={showDemoModal}
+          onClose={() => setShowDemoModal(false)}
         />
 
         {/* Cookie Consent Banner */}

@@ -4,9 +4,10 @@ import { useTheme } from '../contexts/ThemeContext';
 interface HeaderProps {
   isAdminAuthenticated: boolean;
   onLogout: () => void;
+  onShowDemo: () => void;
 }
 
-export default function Header({ isAdminAuthenticated, onLogout }: HeaderProps) {
+export default function Header({ isAdminAuthenticated, onLogout, onShowDemo }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const appTitle = isAdminAuthenticated ? 'Raid Value Calculator - Admin' : 'Raid Value Calculator';
 
@@ -61,6 +62,19 @@ export default function Header({ isAdminAuthenticated, onLogout }: HeaderProps) 
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Demo Video Button */}
+            <motion.button
+              onClick={onShowDemo}
+              className="p-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white backdrop-blur-sm border border-white/20 transition-all duration-300 group shadow-lg"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="Watch app demo video"
+            >
+              <span className="text-2xl transition-transform duration-300 group-hover:scale-110">
+                🎬
+              </span>
+            </motion.button>
+            
             {/* Dark Mode Toggle */}
             <motion.button
               onClick={toggleTheme}
