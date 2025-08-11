@@ -248,23 +248,140 @@ export const getItemPriceHistory = async (itemTypeId: string, days: number = 30)
 // Get all recent price history across all items
 export const getAllPriceHistory = async (days: number = 30): Promise<PriceSnapshot[]> => {
   try {
+    console.log('🔍 Firebase: Getting price history for last', days, 'days');
+    
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     
-    const q = query(
-      collection(db, 'price_history'),
-      where('timestamp', '>=', Timestamp.fromDate(cutoffDate)),
-      orderBy('timestamp', 'desc'),
-      limit(100) // Limit to prevent too much data
-    );
+    // First try price_history collection
+    try {
+      console.log('📊 Firebase: Trying price_history collection...');
+      const q = query(
+        collection(db, 'price_history'),
+        where('timestamp', '>=', Timestamp.fromDate(cutoffDate)),
+        orderBy('timestamp', 'desc'),
+        limit(100)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.docs.length > 0) {
+        console.log('✅ Firebase: Found', querySnapshot.docs.length, 'price history documents');
+        return querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as PriceSnapshot[];
+      } else {
+        console.log('⚠️ Firebase: price_history collection is empty');
+      }
+    } catch (priceHistoryError: any) {
+      console.log('❌ Firebase: Price history collection not accessible:', priceHistoryError?.message || priceHistoryError);
+    }
     
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as PriceSnapshot[];
-  } catch (error) {
-    console.error('Error getting all price history:', error);
+    // If no price_history, convert pack data
+    console.log('🔄 Firebase: Converting pack data to price snapshots...');
+    const packsQuery = query(collection(db, 'packs'), limit(50));
+    const packsSnapshot = await getDocs(packsQuery);
+    console.log('📦 Firebase: Found', packsSnapshot.docs.length, 'packs to convert');
+    
+    if (packsSnapshot.docs.length === 0) {
+      return [];
+    }
+    
+    const packData = packsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    console.log('📋 Firebase: Sample pack data structure:', packData.slice(0, 1));
+    const priceSnapshots: PriceSnapshot[] = [];
+    
+    for (const pack of packData) {
+      console.log(`🔍 Firebase: Processing pack "${pack.name}" with ${pack.items?.length || 0} items`);
+      if (!pack.items || !Array.isArray(pack.items)) {
+        console.log('⚠️ Firebase: Pack has no items array, skipping:', pack.name);
+        continue;
+      }
+      
+      // Fix timestamp conversion - pack.created_at is already a Firestore Timestamp
+      const timestamp = pack.created_at || Timestamp.now();
+      const packPrice = pack.price || 5.0;
+      const costPerEnergy = pack.cost_per_energy || 0.006;
+      console.log(`📊 Firebase: Pack "${pack.name}" - Price: $${packPrice}, Cost/Energy: $${costPerEnergy}`);
+      
+      for (const item of pack.items) {
+        let itemName = '';
+        let baseValue = 0;
+        
+        switch (item.itemTypeId) {
+          case 'energy_pot':
+            itemName = 'Energy Pot';
+            baseValue = costPerEnergy * 130; // 130 energy per pot
+            break;
+          case 'raw_energy':
+            itemName = 'Raw Energy';
+            baseValue = costPerEnergy;
+            break;
+          case 'multi_battle_attempts':
+            itemName = 'Multi-Battle Attempts';
+            baseValue = costPerEnergy * 10;
+            break;
+          case 'silver':
+            itemName = 'Silver';
+            baseValue = costPerEnergy * 0.001;
+            break;
+          case 'mystery_shard':
+            itemName = 'Mystery Shard';
+            baseValue = Math.max(0.02, packPrice * 0.15);
+            break;
+          case 'ancient_shard':
+            itemName = 'Ancient Shard';
+            baseValue = Math.max(0.1, packPrice * 0.4);
+            break;
+          case 'void_shard':
+            itemName = 'Void Shard';
+            baseValue = Math.max(0.5, packPrice * 0.7);
+            break;
+          case 'sacred_shard':
+            itemName = 'Sacred Shard';
+            baseValue = Math.max(2.0, packPrice * 1.2);
+            break;
+          case 'legendary_tome':
+            itemName = 'Legendary Tome';
+            baseValue = Math.max(1.0, packPrice * 0.6);
+            break;
+          case 'epic_tome':
+            itemName = 'Epic Tome';
+            baseValue = Math.max(0.3, packPrice * 0.25);
+            break;
+          case 'rare_tome':
+            itemName = 'Rare Tome';
+            baseValue = Math.max(0.1, packPrice * 0.08);
+            break;
+          default:
+            itemName = item.itemTypeId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+            baseValue = costPerEnergy * 5;
+        }
+        
+        if (itemName && baseValue > 0) {
+          priceSnapshots.push({
+            id: `${pack.id}_${item.itemTypeId}`,
+            itemTypeId: item.itemTypeId,
+            itemName,
+            price: baseValue,
+            confidence: 80,
+            packCount: 1,
+            totalQuantity: item.quantity || 1,
+            timestamp,
+            created_at: timestamp
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ Firebase: Created ${priceSnapshots.length} price snapshots from pack data`);
+    if (priceSnapshots.length > 0) {
+      console.log('📋 Firebase: Sample converted items:', priceSnapshots.slice(0, 3).map(p => ({ name: p.itemName, price: p.price })));
+    }
+    return priceSnapshots;
+    
+  } catch (error: any) {
+    console.error('💥 Firebase: Error getting all price history:', error?.message || error);
     return [];
   }
 };
