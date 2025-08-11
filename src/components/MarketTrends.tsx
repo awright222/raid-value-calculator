@@ -92,7 +92,7 @@ function FlipCard({ item, index }: FlipCardProps) {
             <div className={`text-xs ${
               isDark ? 'text-gray-500' : 'text-gray-500'
             }`}>
-              {item.totalPacks} packs • {item.confidence}% confidence
+              Market price estimate
             </div>
             <div className={`text-xs ${
               isDark ? 'text-gray-400' : 'text-gray-500'
@@ -568,8 +568,8 @@ export default function MarketTrends() {
           itemName,
           currentPrice,
           priceHistory,
-          totalPacks: totalPacks, // Use actual total pack count
-          confidence: 95
+          totalPacks: 0, // Not displaying pack count anymore
+          confidence: 0  // Not displaying confidence anymore
         };
       });
       
@@ -630,7 +630,7 @@ export default function MarketTrends() {
         <p className={`text-lg ${
           isDark ? 'text-gray-300' : 'text-gray-600'
         }`}>
-          Interactive price cards showing real-time item values from {actualTotalPacks} pack analyses
+          Interactive price cards with flip animations to explore item value trends and market insights
         </p>
       </motion.div>
 
@@ -677,9 +677,9 @@ export default function MarketTrends() {
             <div className={`text-2xl font-bold ${
               isDark ? 'text-purple-400' : 'text-purple-600'
             }`}>
-              95%
+              {actualTotalPacks}
             </div>
-            <div className="text-sm">Average Confidence</div>
+            <div className="text-sm">Packs Analyzed</div>
           </div>
         </div>
       </motion.div>
