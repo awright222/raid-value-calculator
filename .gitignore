@@ -48,5 +48,9 @@ firestore-debug.log
 *.sqlite
 *.sqlite3
 
+# Large video files (hosted on Firebase)
+public/*.mov
+public/*.mp4
+
 # Firebase cache
 .firebase/fix-existing-packs.js
