@@ -5,6 +5,7 @@ import AdminPanel from './components/AdminPanel';
 import ItemValues from './components/ItemValues';
 import CommunityTab from './components/CommunityTab';
 import MarketTrends from './components/MarketTrends';
+import ContactTab from './components/ContactTab';
 import Header from './components/Header';
 import LoginModal from './components/LoginModal';
 import { BiometricLogin } from './components/BiometricLogin';
@@ -13,7 +14,7 @@ import { CookieConsent } from './components/CookieConsent';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'community' | 'trends' | 'admin'>('analyze');
+  const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'community' | 'trends' | 'contact' | 'admin'>('analyze');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBiometricLogin, setShowBiometricLogin] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -82,7 +83,7 @@ function App() {
     }
   };
 
-  const handleTabClick = (tabId: 'analyze' | 'values' | 'community' | 'trends' | 'admin') => {
+  const handleTabClick = (tabId: 'analyze' | 'values' | 'community' | 'trends' | 'contact' | 'admin') => {
     if (tabId === 'admin' && !isAdminAuthenticated) {
       // Show password login by default instead of biometric
       setShowLoginModal(true);
@@ -104,6 +105,7 @@ function App() {
     { id: 'values', label: 'Item Values', icon: '💰' },
     { id: 'community', label: 'Community', icon: '👥' },
     { id: 'trends', label: 'Market Trends', icon: '📈' },
+    { id: 'contact', label: 'Contact Dev', icon: '💬' },
   ] as const;
 
   const adminTab = { id: 'admin', label: isAdminAuthenticated ? 'Admin Tools' : 'Admin Login', icon: isAdminAuthenticated ? '⚙️' : '🔐' } as const;
@@ -164,6 +166,7 @@ function App() {
             {activeTab === 'values' && <ItemValues />}
             {activeTab === 'community' && <CommunityTab />}
             {activeTab === 'trends' && <MarketTrends />}
+            {activeTab === 'contact' && <ContactTab />}
             {activeTab === 'admin' && isAdminAuthenticated && (
               <AdminPanel onPackAdded={() => {}} />
             )}

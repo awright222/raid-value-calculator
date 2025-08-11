@@ -3,18 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getPendingPacks, confirmPendingPack } from '../firebase/pendingPacks';
 import type { PendingPack } from '../utils/duplicateDetection';
 
-interface PendingPacksProps {
-  userEmail?: string;
-}
-
-export function PendingPacks({ userEmail }: PendingPacksProps) {
+export function PendingPacks() {
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingPacks, setConfirmingPacks] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  // Generate user ID (in a real app, this would come from auth)
-  const userId = userEmail || `user_${Date.now()}`;
+  // Generate user ID (no longer using email)
+  const userId = `user_${Date.now()}`;
 
   const loadPendingPacks = async () => {
     setLoading(true);
@@ -198,8 +194,8 @@ export function PendingPacks({ userEmail }: PendingPacksProps) {
                       <div className="mb-4">
                         <h4 className="text-sm font-semibold text-secondary-700 dark:text-gray-300 mb-2">📦 Pack Contents:</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {pack.items.map((item, index) => {
-                            const itemName = item.itemTypeId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                          {pack.items.map((item: any, index: number) => {
+                            const itemName = item.itemTypeId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
                             return (
                               <div key={index} className="flex justify-between items-center bg-white dark:bg-gray-700 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600">
                                 <span className="font-medium text-gray-700 dark:text-gray-200">{itemName}</span>

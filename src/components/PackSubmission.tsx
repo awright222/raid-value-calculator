@@ -25,7 +25,6 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
     items: []
   });
   
-  const [submitterEmail, setSubmitterEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
   const [useAutocomplete, setUseAutocomplete] = useState(true); // Default to autocomplete
@@ -100,7 +99,7 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       // Use proper submission function that handles validation and signatures
       const { submitPendingPack } = await import('../firebase/pendingPacks');
       
-      const userId = submitterEmail || `user_${Date.now()}`;
+      const userId = `user_${Date.now()}`;
       
       const packData = {
         name: formData.name.trim(),
@@ -111,10 +110,10 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
         cost_per_energy: costPerEnergy,
         items: formData.items.filter(item => item.itemTypeId && item.quantity > 0),
         submitter_id: userId,
-        submitter_email: submitterEmail || ''
+        submitter_email: ''
       };
       
-      const result = await submitPendingPack(packData, userId, submitterEmail || '');
+      const result = await submitPendingPack(packData, userId, '');
       
       // Track pack submission analytics
       analytics.trackConversion('pack_submit', {
@@ -147,7 +146,6 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
           price: 0,
           items: []
         });
-        setSubmitterEmail('');
         
         onSubmissionComplete?.(true, result.message);
       } else {
@@ -204,25 +202,6 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Submitter Email */}
-        <div>
-          <label htmlFor="submitter-email" className="block text-sm font-medium text-secondary-700 mb-2">
-            Your Email (Optional)
-          </label>
-          <input
-            id="submitter-email"
-            name="submitter-email"
-            type="email"
-            value={submitterEmail}
-            onChange={(e) => setSubmitterEmail(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-            placeholder="your.email@example.com"
-          />
-          <p className="text-xs text-secondary-500 mt-1">
-            Optional: Used for duplicate detection and community reputation
-          </p>
-        </div>
-
         {/* Pack Name */}
         <div>
           <label htmlFor="pack-name" className="block text-sm font-medium text-secondary-700 mb-2">

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FiRefreshCcw } from 'react-icons/fi';
 import { ITEM_CATEGORIES, getItemTypes, getItemTypeById, type PackItem, type ItemType } from '../types/itemTypes';
 import { addPack } from '../firebase/database';
 import { getPendingPacks, approvePendingPack, deletePendingPack, cleanupExpiredPacks } from '../firebase/pendingPacks';
+import { getContactInquiries, updateInquiryStatus, deleteInquiry, getInquiryStats, type ContactInquiry } from '../firebase/contact';
 import { updateMultipleItemTypeUtilityScores, checkItemTypesExistInFirebase, initializeItemTypesInFirebase } from '../firebase/itemTypes';
 import { testFirebaseConnection } from '../firebase/connectionTest';
 import { createFirebaseDebugger } from '../utils/firebaseDebugger';
@@ -18,7 +20,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'tracking' | 'debug' | 'utility'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'tracking' | 'debug' | 'utility' | 'contact'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -39,6 +41,17 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
   // Moderation state
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([]);
   const [moderationLoading, setModerationLoading] = useState(false);
+
+  // Contact inquiries state
+  const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactStats, setContactStats] = useState<{
+    total: number;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
+    recentCount: number;
+  }>({ total: 0, byStatus: {}, byType: {}, recentCount: 0 });
+  const [inquiryFilter, setInquiryFilter] = useState<'all' | 'new' | 'in_progress' | 'resolved' | 'closed'>('all');
 
   // Maintenance state
   const [maintenanceStats, setMaintenanceStats] = useState({
@@ -83,6 +96,31 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     return adminItemTypes.filter(item => item.category === category);
   };
 
+  // Track user activity to pause notifications during active work
+  const [lastUserActivity, setLastUserActivity] = useState<Date>(new Date());
+
+  // Update last activity timestamp when user interacts with the page
+  useEffect(() => {
+    const updateActivity = () => setLastUserActivity(new Date());
+    
+    // Listen for user interactions
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, { passive: true });
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity);
+      });
+    };
+  }, []);
+
+  // Get count of new contact inquiries
+  const getNewInquiryCount = (): number => {
+    return contactInquiries.filter(inquiry => inquiry.status === 'new').length;
+  };
+
   // Load admin item types when utility tab is accessed
   useEffect(() => {
     if (activeAdminTab === 'utility') {
@@ -97,6 +135,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     { id: 'tracking', label: 'Price Tracking', icon: '📊', description: 'Long-term market analysis' },
     { id: 'intelligence', label: 'Pack Intelligence', icon: '🧠', description: 'Market analysis & pack evolution' },
     { id: 'utility', label: 'Item Values', icon: '⚖️', description: 'Manage item utility scores' },
+    { id: 'contact', label: 'Contact Inquiries', icon: '📧', description: 'Manage user feedback & bug reports' },
     { id: 'single', label: 'Quick Add', icon: '➕', description: 'Add single pack' },
     { id: 'bulk', label: 'Bulk Import', icon: '📁', description: 'Import multiple packs' },
     { id: 'maintenance', label: 'Maintenance', icon: '🧹', description: 'System cleanup' }
@@ -109,6 +148,37 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     }
   }, [activeAdminTab]);
 
+  // Load contact inquiries immediately on mount and when contact tab is active
+  useEffect(() => {
+    // Always load contact inquiries on mount for notification badge
+    loadContactInquiries();
+    loadContactStats();
+
+    // Set up periodic refresh for new inquiry notifications
+    // Only refresh when component is mounted (admin is authenticated)
+    const interval = setInterval(() => {
+      // Only refresh if not currently loading to avoid overlapping requests
+      // AND user hasn't been active recently (to avoid interrupting active work)
+      const timeSinceLastActivity = Date.now() - lastUserActivity.getTime();
+      const isUserIdle = timeSinceLastActivity > 10000; // 10 seconds of inactivity
+      
+      if (!contactLoading && isUserIdle) {
+        loadContactInquiries();
+        loadContactStats();
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []); // Run once on mount
+
+  // Refresh contact inquiries when contact tab is active or filter changes
+  useEffect(() => {
+    if (activeAdminTab === 'contact') {
+      loadContactInquiries();
+      loadContactStats();
+    }
+  }, [activeAdminTab, inquiryFilter]);
+
   const loadPendingPacks = async () => {
     setModerationLoading(true);
     try {
@@ -118,6 +188,61 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       setError('Failed to load pending packs');
     } finally {
       setModerationLoading(false);
+    }
+  };
+
+  // Contact inquiry functions
+  const loadContactInquiries = async () => {
+    setContactLoading(true);
+    try {
+      let inquiries;
+      if (inquiryFilter === 'all') {
+        inquiries = await getContactInquiries();
+      } else {
+        // Filter would be done client-side for now
+        const allInquiries = await getContactInquiries();
+        inquiries = allInquiries.filter(inquiry => inquiry.status === inquiryFilter);
+      }
+      setContactInquiries(inquiries);
+    } catch (error) {
+      console.error('Failed to load contact inquiries:', error);
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
+  const loadContactStats = async () => {
+    try {
+      const stats = await getInquiryStats();
+      setContactStats(stats);
+    } catch (error) {
+      console.error('Failed to load contact stats:', error);
+    }
+  };
+
+  const handleInquiryStatusUpdate = async (inquiryId: string, newStatus: ContactInquiry['status'], adminNotes?: string) => {
+    try {
+      const success = await updateInquiryStatus(inquiryId, newStatus, adminNotes);
+      if (success) {
+        await loadContactInquiries();
+        await loadContactStats();
+      }
+    } catch (error) {
+      console.error('Failed to update inquiry status:', error);
+    }
+  };
+
+  const handleInquiryDelete = async (inquiryId: string) => {
+    if (window.confirm('Are you sure you want to delete this inquiry?')) {
+      try {
+        const success = await deleteInquiry(inquiryId);
+        if (success) {
+          await loadContactInquiries();
+          await loadContactStats();
+        }
+      } catch (error) {
+        console.error('Failed to delete inquiry:', error);
+      }
     }
   };
 
@@ -573,7 +698,15 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                 }`}
               >
                 <div className="flex flex-col items-center space-y-1">
-                  <span className="text-lg">{tab.icon}</span>
+                  <div className="relative">
+                    <span className="text-lg">{tab.icon}</span>
+                    {/* New inquiry notification dot */}
+                    {tab.id === 'contact' && getNewInquiryCount() > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold shadow-lg animate-pulse">
+                        {getNewInquiryCount()}
+                      </div>
+                    )}
+                  </div>
                   <div className="text-sm font-semibold">{tab.label}</div>
                   <div className="text-xs opacity-75">{tab.description}</div>
                 </div>
@@ -1487,6 +1620,292 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contact Inquiries Management Tab */}
+        {activeAdminTab === 'contact' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
+                Contact Inquiries
+              </h2>
+              <p className="text-secondary-600">
+                Manage user feedback, bug reports, and business inquiries
+              </p>
+            </div>
+
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm">Total Inquiries</p>
+                    <p className="text-2xl font-bold">{contactStats.total}</p>
+                  </div>
+                  <div className="text-3xl opacity-80">📧</div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg relative">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-red-100 text-sm">New/Unread</p>
+                    <p className="text-2xl font-bold">{getNewInquiryCount()}</p>
+                  </div>
+                  <div className="text-3xl opacity-80">🔴</div>
+                </div>
+                {getNewInquiryCount() > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-white text-red-600 text-xs rounded-full min-w-[20px] h-[20px] flex items-center justify-center font-bold shadow-lg">
+                    !
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-yellow-100 text-sm">Bug Reports</p>
+                    <p className="text-2xl font-bold">{contactStats.byType.bug_report || 0}</p>
+                  </div>
+                  <div className="text-3xl opacity-80">🐛</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-100 text-sm">General/Ideas</p>
+                    <p className="text-2xl font-bold">{(contactStats.byType.comment || 0) + (contactStats.byType.recommendation || 0)}</p>
+                  </div>
+                  <div className="text-3xl opacity-80">💡</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-100 text-sm">Business</p>
+                    <p className="text-2xl font-bold">{(contactStats.byType.advertising || 0) + (contactStats.byType.partnership || 0)}</p>
+                  </div>
+                  <div className="text-3xl opacity-80">💼</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-4">
+                <label className="text-sm font-medium text-gray-700">Filter by Status:</label>
+                <select
+                  value={inquiryFilter}
+                  onChange={(e) => setInquiryFilter(e.target.value as any)}
+                  className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">All Inquiries</option>
+                  <option value="new">New</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+
+              <button
+                onClick={() => {
+                  loadContactInquiries();
+                  loadContactStats();
+                }}
+                className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                disabled={contactLoading}
+              >
+                <FiRefreshCcw className={`mr-2 ${contactLoading ? 'animate-spin' : ''}`} />
+                {contactLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            {/* Inquiries List */}
+            {contactLoading ? (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-primary-600 bg-white transition ease-in-out duration-150">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Loading inquiries...
+                </div>
+              </div>
+            ) : contactInquiries.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <div className="text-6xl mb-4">📭</div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No inquiries yet</h3>
+                <p className="text-gray-600">Contact inquiries will appear here once users start submitting them.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {contactInquiries.filter(inquiry => inquiry.id).map((inquiry, index) => {
+                  const getTypeIcon = (type: string) => {
+                    switch (type) {
+                      case 'comment': return '💬';
+                      case 'recommendation': return '💡';
+                      case 'advertising': return '📢';
+                      case 'partnership': return '🤝';
+                      case 'bug_report': return '🐛';
+                      default: return '📧';
+                    }
+                  };
+
+                  const getStatusColor = (status: string) => {
+                    switch (status) {
+                      case 'new': return 'bg-blue-100 text-blue-800';
+                      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+                      case 'resolved': return 'bg-green-100 text-green-800';
+                      case 'closed': return 'bg-gray-100 text-gray-800';
+                      default: return 'bg-gray-100 text-gray-800';
+                    }
+                  };
+
+                  const getTypeColor = (type: string) => {
+                    switch (type) {
+                      case 'comment': return 'bg-purple-100 text-purple-800';
+                      case 'recommendation': return 'bg-green-100 text-green-800';
+                      case 'advertising': return 'bg-orange-100 text-orange-800';
+                      case 'partnership': return 'bg-blue-100 text-blue-800';
+                      case 'bug_report': return 'bg-red-100 text-red-800';
+                      default: return 'bg-gray-100 text-gray-800';
+                    }
+                  };
+
+                  const getTypeLabel = (type: string) => {
+                    switch (type) {
+                      case 'comment': return 'General';
+                      case 'recommendation': return 'Recommendation';
+                      case 'advertising': return 'Advertising';
+                      case 'partnership': return 'Partnership';
+                      case 'bug_report': return 'Bug Report';
+                      default: return type.replace('_', ' ');
+                    }
+                  };
+
+                  return (
+                    <motion.div
+                      key={inquiry.id || `inquiry-${index}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`bg-white border rounded-lg p-6 hover:shadow-md transition-shadow ${
+                        inquiry.status === 'new' 
+                          ? 'border-red-200 shadow-red-100 shadow-lg ring-1 ring-red-100' 
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-start space-x-3">
+                          <div className="text-2xl">{getTypeIcon(inquiry.type)}</div>
+                          <div>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h3 className="text-lg font-semibold text-gray-900">{inquiry.subject}</h3>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(inquiry.type)}`}>
+                                {getTypeLabel(inquiry.type)}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm text-gray-500">
+                              <span>{inquiry.timestamp.toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>{inquiry.timestamp.toLocaleTimeString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(inquiry.status)}`}>
+                            {inquiry.status.replace('_', ' ')}
+                          </span>
+                          {inquiry.status === 'new' && (
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Message */}
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <p className="text-gray-700 whitespace-pre-wrap">{inquiry.message}</p>
+                      </div>
+
+                      {/* Contact Info */}
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center text-sm text-blue-700">
+                          <span className="font-medium mr-2">Contact Email:</span>
+                          <a href={`mailto:${inquiry.contactEmail}`} className="underline hover:text-blue-800">
+                            {inquiry.contactEmail}
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Admin Notes */}
+                      {inquiry.adminNotes && (
+                        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <div className="text-sm text-yellow-800">
+                            <span className="font-medium">Admin Notes:</span>
+                            <p className="mt-1">{inquiry.adminNotes}</p>
+                            {inquiry.adminResponseDate && (
+                              <p className="text-xs text-yellow-600 mt-2">
+                                Updated: {inquiry.adminResponseDate.toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                        <div className="flex items-center space-x-2">
+                          <select
+                            value={inquiry.status}
+                            onChange={(e) => handleInquiryStatusUpdate(inquiry.id!, e.target.value as ContactInquiry['status'])}
+                            className="px-3 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                          >
+                            <option value="new">New</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                          
+                          <button
+                            onClick={() => {
+                              const notes = prompt('Add admin notes (optional):');
+                              if (notes !== null) {
+                                handleInquiryStatusUpdate(inquiry.id!, inquiry.status, notes);
+                              }
+                            }}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
+                          >
+                            Add Notes
+                          </button>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <a
+                            href={`mailto:${inquiry.contactEmail}?subject=Re: ${inquiry.subject}`}
+                            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors"
+                          >
+                            Reply
+                          </a>
+                          
+                          <button
+                            onClick={() => handleInquiryDelete(inquiry.id!)}
+                            className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </div>

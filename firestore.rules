@@ -43,6 +43,13 @@ service cloud.firestore {
       allow write: if true; // Allow admin utility score updates
     }
     
+    // Allow public write access for contact inquiries (submissions)
+    // and admin read/write access for management
+    match /contact_inquiries/{inquiryId} {
+      allow read: if true; // Allow admin to read all inquiries
+      allow write: if true; // Allow users to submit inquiries and admin to manage them
+    }
+    
     // Deny access to any other collections
     match /{document=**} {
       allow read, write: if false;

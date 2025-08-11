@@ -48,16 +48,28 @@ function FlipCard({ item, index }: FlipCardProps) {
   const trendColor = priceChange > 0 ? 'text-green-500' : priceChange < 0 ? 'text-red-500' : 'text-gray-500';
   const trendDirection = priceChange > 0 ? '↗' : priceChange < 0 ? '↘' : '→';
   
-  // Create simple price chart data points
-  const chartPoints = item.priceHistory.slice(-7).map((point, i, arr) => ({
-    x: (i / (arr.length - 1)) * 100,
-    y: 100 - ((point.price - Math.min(...arr.map(p => p.price))) / (Math.max(...arr.map(p => p.price)) - Math.min(...arr.map(p => p.price)))) * 80
-  }));
+  // Create simple price chart data points - only use actual data points
+  const validPriceHistory = item.priceHistory.filter(point => point.confidence > 30); // Only show high-confidence data
+  const chartPoints = validPriceHistory.length > 1 ? validPriceHistory.map((point, i, arr) => {
+    const minPrice = Math.min(...arr.map(p => p.price));
+    const maxPrice = Math.max(...arr.map(p => p.price));
+    const priceRange = maxPrice - minPrice;
+    
+    return {
+      x: (i / (arr.length - 1)) * 100,
+      y: priceRange > 0 ? 100 - ((point.price - minPrice) / priceRange) * 80 : 50 // Flat line if no price variation
+    };
+  }) : [];
   
   const pathData = chartPoints.length > 1 
     ? `M ${chartPoints[0].x} ${chartPoints[0].y} ` + 
       chartPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ')
     : '';
+  
+  // Debug info for sparse data
+  if (validPriceHistory.length < 2) {
+    console.log(`📊 ${item.itemName} sparse data: ${item.priceHistory.length} total points, ${validPriceHistory.length} high-confidence points`);
+  }
 
   return (
     <motion.div
@@ -147,7 +159,7 @@ function FlipCard({ item, index }: FlipCardProps) {
           {/* Mini Chart */}
           <div className="mb-6">
             <svg width="100%" height="80" className="overflow-visible">
-              {pathData && (
+              {pathData && chartPoints.length > 1 ? (
                 <>
                   <defs>
                     <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
@@ -175,6 +187,16 @@ function FlipCard({ item, index }: FlipCardProps) {
                     />
                   ))}
                 </>
+              ) : (
+                // Show "Insufficient Data" message for items with sparse data
+                <text
+                  x="50"
+                  y="40"
+                  textAnchor="middle"
+                  className={`text-xs ${isDark ? 'fill-gray-500' : 'fill-gray-400'}`}
+                >
+                  {validPriceHistory.length === 0 ? 'No historical data' : 'Stable pricing'}
+                </text>
               )}
             </svg>
           </div>
@@ -409,7 +431,7 @@ export default function MarketTrends() {
         
         console.log(`� ${itemName}: Found in ${packsWithItem.length} packs over last 30 days`);
         
-        // Build daily price history for the last 7 days
+        // Build daily price history for the last 7 days - ONLY include days with actual data
         const priceHistory = [];
         const today = new Date();
         
@@ -428,31 +450,109 @@ export default function MarketTrends() {
             return packDate && packDate >= dayStart && packDate <= dayEnd;
           });
           
-          let dayPrice = currentPrice; // Default to current price
-          
+          // ONLY add to price history if we have actual data for this day
           if (dayPacks.length > 0) {
-            // Calculate average price for this day using the same pricing logic
-            const dayItemCosts = dayPacks.map(pack => {
-              if (!pack.items) return 0;
+            let dayPrice = currentPrice; // Start with current price as fallback
+            // Use more robust pricing calculation
+            // Instead of crude division, use the item's known market value from pricing service
+            const itemPricesFromPacks: number[] = [];
+            
+            dayPacks.forEach(pack => {
+              if (!pack.items) return;
+              
               const item = pack.items.find((item: any) => item.itemTypeId === itemTypeId);
-              const itemQuantity = item?.quantity || 1;
-              // Rough estimate: distribute pack price by item quantities
-              const totalItems = pack.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
-              return (pack.price * itemQuantity) / totalItems;
+              if (!item) return;
+              
+              // Method 1: If this is a single-item pack, we have definitive pricing
+              if (pack.items.length === 1) {
+                const pricePerUnit = pack.price / item.quantity;
+                itemPricesFromPacks.push(pricePerUnit);
+                console.log(`🎯 ${itemName} single-item pack: $${pricePerUnit.toFixed(4)} (${item.quantity} items for $${pack.price})`);
+              }
+              // Method 2: For multi-item packs, use proportional value based on current market prices
+              else {
+                // Calculate known value of other items in the pack
+                let knownValue = 0;
+                let unknownItems = 0;
+                
+                pack.items.forEach((packItem: any) => {
+                  if (packItem.itemTypeId !== itemTypeId && itemPrices[packItem.itemTypeId]) {
+                    knownValue += itemPrices[packItem.itemTypeId] * packItem.quantity;
+                  } else if (packItem.itemTypeId === itemTypeId) {
+                    unknownItems = packItem.quantity;
+                  }
+                });
+                
+                // If we can isolate this item's value
+                if (knownValue < pack.price && unknownItems > 0) {
+                  const remainingValue = pack.price - knownValue;
+                  const pricePerUnit = remainingValue / unknownItems;
+                  
+                  // Sanity check: price should be within reasonable range of current price
+                  const reasonableMin = currentPrice * 0.1;  // Not less than 10% of current price
+                  const reasonableMax = currentPrice * 10;   // Not more than 10x current price
+                  
+                  if (pricePerUnit >= reasonableMin && pricePerUnit <= reasonableMax) {
+                    itemPricesFromPacks.push(pricePerUnit);
+                    console.log(`🔍 ${itemName} multi-item pack: $${pricePerUnit.toFixed(4)} (remaining $${remainingValue.toFixed(2)} / ${unknownItems} items)`);
+                  } else {
+                    console.warn(`⚠️ ${itemName} unrealistic price $${pricePerUnit.toFixed(4)} rejected (range: $${reasonableMin.toFixed(4)}-$${reasonableMax.toFixed(4)})`);
+                  }
+                }
+              }
             });
             
-            if (dayItemCosts.length > 0 && dayPacks[0].items) {
-              const firstPackItem = dayPacks[0].items.find((item: any) => item.itemTypeId === itemTypeId);
-              const itemQuantity = firstPackItem?.quantity || 1;
-              dayPrice = dayItemCosts.reduce((sum, cost) => sum + cost, 0) / dayItemCosts.length / itemQuantity;
+            // Calculate average from valid prices
+            if (itemPricesFromPacks.length > 0) {
+              dayPrice = itemPricesFromPacks.reduce((sum, price) => sum + price, 0) / itemPricesFromPacks.length;
+              console.log(`📊 ${itemName} day average: $${dayPrice.toFixed(4)} from ${itemPricesFromPacks.length} valid data points`);
+            } else {
+              console.log(`⏭️ ${itemName} no valid pricing data for ${targetDate.toLocaleDateString()}, using current price $${currentPrice.toFixed(4)}`);
+            }
+            
+            // Add this day to price history (only when we have actual pack data)
+            priceHistory.push({
+              date: targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              price: Math.max(0.0001, dayPrice),
+              confidence: Math.min(95, dayPacks.length * 20) // High confidence since we have real data
+            });
+            
+            console.log(`✅ ${itemName} added data point for ${targetDate.toLocaleDateString()}: $${dayPrice.toFixed(4)} (${dayPacks.length} packs)`);
+          } else {
+            console.log(`⏭️ ${itemName} no packs found for ${targetDate.toLocaleDateString()}, skipping data point`);
+          }
+        }
+        
+        // If we have no historical data points, add the current price as a single point
+        if (priceHistory.length === 0) {
+          priceHistory.push({
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            price: currentPrice,
+            confidence: 50 // Medium confidence for current pricing data
+          });
+          console.log(`📍 ${itemName} no historical data, using current price point: $${currentPrice.toFixed(4)}`);
+        }
+        
+        // After building price history, smooth out unrealistic jumps ONLY if we have multiple points
+        // This prevents major anomalies from corrupting the trend display
+        if (priceHistory.length > 2) {
+          for (let i = 1; i < priceHistory.length - 1; i++) {
+            const prev = priceHistory[i - 1].price;
+            const current = priceHistory[i].price;
+            const next = priceHistory[i + 1].price;
+            
+            // If current price is dramatically different from neighbors (more than 50x difference)
+            const maxDeviation = 50;
+            if (current < prev / maxDeviation || current > prev * maxDeviation ||
+                current < next / maxDeviation || current > next * maxDeviation) {
+              
+              // Replace with interpolated value
+              const smoothedPrice = (prev + next) / 2;
+              console.warn(`🔧 ${itemName} anomaly detected on ${priceHistory[i].date}: $${current.toFixed(4)} -> $${smoothedPrice.toFixed(4)} (smoothed)`);
+              priceHistory[i].price = smoothedPrice;
+              priceHistory[i].confidence = Math.max(10, priceHistory[i].confidence - 30); // Lower confidence for smoothed data
             }
           }
-          
-          priceHistory.push({
-            date: targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            price: Math.max(0.0001, dayPrice),
-            confidence: dayPacks.length > 0 ? Math.min(95, dayPacks.length * 20) : 50
-          });
         }
         
         console.log(`📊 ${itemName} price history:`, priceHistory.map(p => `${p.date}: $${p.price.toFixed(4)}`).join(', '));

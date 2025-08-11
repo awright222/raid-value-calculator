@@ -75,7 +75,7 @@ class PrivacyAnalytics {
   }
 
   // Track conversion events (pack submissions, etc.)
-  trackConversion(type: 'pack_submit' | 'calculator_use' | 'admin_action', data?: Record<string, any>) {
+  trackConversion(type: 'pack_submit' | 'calculator_use' | 'admin_action' | 'contact_submit', data?: Record<string, any>) {
     if (!this.hasConsent('analytics')) return;
 
     this.trackEvent('conversion', {
