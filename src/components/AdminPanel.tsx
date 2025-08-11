@@ -12,6 +12,7 @@ import { diagnosePricingServiceIssue } from '../utils/itemValuesDiagnostic';
 import { PackIntelligence } from './PackIntelligence';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import { MarketTrackingPanel } from './MarketTrackingPanel';
+import VideoAnalytics from './VideoAnalytics';
 import ItemAutocomplete from './ItemAutocomplete';
 import type { PendingPack } from '../utils/duplicateDetection';
 
@@ -20,7 +21,7 @@ interface AdminPanelProps {
 }
 
 function AdminPanel({ onPackAdded }: AdminPanelProps) {
-  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'tracking' | 'debug' | 'utility' | 'contact'>('moderate');
+  const [activeAdminTab, setActiveAdminTab] = useState<'single' | 'bulk' | 'moderate' | 'maintenance' | 'intelligence' | 'analytics' | 'tracking' | 'video' | 'debug' | 'utility' | 'contact'>('moderate');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -132,6 +133,7 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     { id: 'moderate', label: 'Moderate', icon: '🛡️', description: 'Review pending submissions' },
     { id: 'debug', label: 'Debug', icon: '🔧', description: 'Firebase diagnostics' },
     { id: 'analytics', label: 'Analytics', icon: '📈', description: 'User engagement & traffic stats' },
+    { id: 'video', label: 'Video Analytics', icon: '🎬', description: 'Demo video views & engagement' },
     { id: 'tracking', label: 'Price Tracking', icon: '📊', description: 'Long-term market analysis' },
     { id: 'intelligence', label: 'Pack Intelligence', icon: '🧠', description: 'Market analysis & pack evolution' },
     { id: 'utility', label: 'Item Values', icon: '⚖️', description: 'Manage item utility scores' },
@@ -1078,6 +1080,13 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
             </div>
             
             <MarketTrackingPanel isDark={false} />
+          </div>
+        )}
+
+        {/* Video Analytics Tab */}
+        {activeAdminTab === 'video' && (
+          <div className="glass-effect rounded-2xl p-8 shadow-2xl">
+            <VideoAnalytics />
           </div>
         )}
 

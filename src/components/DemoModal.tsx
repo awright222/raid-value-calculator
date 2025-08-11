@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
+import { trackVideoEvent } from '../firebase/videoAnalytics';
 
 interface DemoModalProps {
   isOpen: boolean;
@@ -10,10 +11,56 @@ interface DemoModalProps {
 export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
+    }
+  };
+
+  // Track when modal is opened (video view)
+  useEffect(() => {
+    if (isOpen) {
+      trackVideoEvent('view');
+    }
+  }, [isOpen]);
+
+  // Track when modal is closed
+  const handleClose = () => {
+    const video = videoRef.current;
+    if (video && !video.paused) {
+      trackVideoEvent('close', video.currentTime, video.duration);
+    }
+    onClose();
+  };
+
+  // Video event handlers
+  const handleVideoPlay = () => {
+    const video = videoRef.current;
+    if (video) {
+      trackVideoEvent('play', video.currentTime, video.duration);
+    }
+  };
+
+  const handleVideoPause = () => {
+    const video = videoRef.current;
+    if (video) {
+      trackVideoEvent('pause', video.currentTime, video.duration);
+    }
+  };
+
+  const handleVideoSeek = () => {
+    const video = videoRef.current;
+    if (video) {
+      trackVideoEvent('seek', video.currentTime, video.duration);
+    }
+  };
+
+  const handleVideoEnded = () => {
+    const video = videoRef.current;
+    if (video) {
+      trackVideoEvent('ended', video.currentTime, video.duration);
     }
   };
 
@@ -48,7 +95,7 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
                   </p>
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="text-primary-100 hover:text-white transition-colors text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"
                   aria-label="Close demo"
                 >
@@ -61,6 +108,7 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
             <div className="p-6" onClick={(e) => e.stopPropagation()}>
               <div className="relative bg-black rounded-xl overflow-hidden">
                 <video
+                  ref={videoRef}
                   controls
                   className="w-full max-h-[50vh] object-contain block"
                   poster="/RaidShadowLegendsBanner.jpg"
@@ -75,6 +123,10 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
                   onLoadStart={() => console.log('Video loading started')}
                   onLoadedData={() => console.log('Video data loaded')}
                   onError={(e) => console.error('Video error:', e)}
+                  onPlay={handleVideoPlay}
+                  onPause={handleVideoPause}
+                  onSeeked={handleVideoSeek}
+                  onEnded={handleVideoEnded}
                 >
                   <source src="/RaidPackValueCalcDemo.mov" type="video/mp4" />
                   <source src="/RaidPackValueCalcDemo.mp4" type="video/mp4" />
@@ -130,7 +182,7 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
                 💡 Tip: Share this site link with your guild or friends!
               </div>
               <motion.button
-                onClick={onClose}
+                onClick={handleClose}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all font-medium shadow-lg text-sm"
