@@ -82,11 +82,23 @@ export interface MarketTrend {
     packName: string;
     grade: string;
     costPerEnergy: number;
+    price?: number;
+    items?: Array<{
+      itemTypeId: string;
+      itemName?: string;
+      quantity: number;
+    }>;
   };
   worstDeal: {
     packName: string;
     grade: string;
     costPerEnergy: number;
+    price?: number;
+    items?: Array<{
+      itemTypeId: string;
+      itemName?: string;
+      quantity: number;
+    }>;
   };
   trendDirection: 'improving' | 'declining' | 'stable';
   periodStart: Timestamp;
