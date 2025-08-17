@@ -72,6 +72,14 @@ export const ITEM_TYPES: ItemType[] = [
     utilityScore: 7,
     utilityReasoning: 'Useful but less efficient than energy packs for most players'
   },
+  {
+    id: 'heros_path_coins',
+    name: "Hero's Path Coins",
+    category: ITEM_CATEGORIES.CURRENCY,
+    description: 'Special currency for Hero\'s Path rewards and upgrades',
+    utilityScore: 6,
+    utilityReasoning: 'Useful for Hero\'s Path progression, but limited use cases'
+  },
 
   // Leveling
   {
