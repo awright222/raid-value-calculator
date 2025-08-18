@@ -52,12 +52,23 @@ class PrivacyAnalytics {
   }) {
     if (!this.hasConsent('analytics')) return;
 
+    const priceRange = this.getPriceRange(packData.price);
+    
     this.trackEvent('pack_view', {
       sessionId: this.sessionId,
       packName: packData.packName,
-      priceRange: this.getPriceRange(packData.price),
+      priceRange: priceRange,
       grade: packData.grade,
       energyRange: this.getEnergyRange(packData.energyValue),
+      timestamp: Date.now()
+    });
+
+    // Also track as engagement for spending interest analysis
+    this.trackEvent('user_engagement', {
+      sessionId: this.sessionId,
+      action: 'pack_analysis',
+      priceRange: priceRange,
+      packGrade: packData.grade,
       timestamp: Date.now()
     });
   }
@@ -166,8 +177,10 @@ class PrivacyAnalytics {
   getAnalyticsSummary(): Promise<{
     uniqueUsers: number;
     totalVisits: number;
+    avgSessionDuration?: number;
     popularPacks: Array<{ name: string; views: number }>;
     peakHours: Array<{ hour: number; activity: number }>;
+    regionData?: Array<{ country: string; region: string; users: number }>;
     engagementData: {
       totalEngagements: number;
       topEngagements: Array<{ action: string; count: number }>;
@@ -188,16 +201,54 @@ class PrivacyAnalytics {
       try {
         const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
         
-        const sessions = new Set();
+        const sessionData: Record<string, { start: number; end: number; timezone?: string }> = {};
         const pageViews = events.filter((e: any) => e.eventType === 'page_view');
         const packViews = events.filter((e: any) => e.eventType === 'pack_view');
         
-        // Count unique sessions (proxy for unique users)
+        // Build session data and calculate durations
         events.forEach((event: any) => {
           if (event.data.sessionId) {
-            sessions.add(event.data.sessionId);
+            const sessionId = event.data.sessionId;
+            const timestamp = event.data.timestamp;
+            
+            if (!sessionData[sessionId]) {
+              sessionData[sessionId] = { 
+                start: timestamp, 
+                end: timestamp,
+                timezone: event.data.timezone 
+              };
+            } else {
+              sessionData[sessionId].end = Math.max(sessionData[sessionId].end, timestamp);
+            }
           }
         });
+
+        // Calculate average session duration
+        const sessionDurations = Object.values(sessionData)
+          .map(session => session.end - session.start)
+          .filter(duration => duration > 0); // Filter out 0-duration sessions
+          
+        const avgSessionDuration = sessionDurations.length > 0 
+          ? sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length
+          : undefined;
+
+        // Analyze region data from timezones
+        const regionCounts: Record<string, number> = {};
+        Object.values(sessionData).forEach((session) => {
+          if (session.timezone) {
+            // Extract region from timezone (e.g., "America/New_York" -> "America")
+            const region = session.timezone.split('/')[0] || 'Unknown';
+            regionCounts[region] = (regionCounts[region] || 0) + 1;
+          }
+        });
+
+        const regionData = Object.entries(regionCounts)
+          .map(([region, users]) => ({ 
+            country: region, 
+            region: region, 
+            users 
+          }))
+          .sort((a, b) => b.users - a.users);
 
         // Analyze pack popularity
         const packCounts: Record<string, number> = {};
@@ -268,10 +319,12 @@ class PrivacyAnalytics {
         });
 
         resolve({
-          uniqueUsers: sessions.size,
+          uniqueUsers: Object.keys(sessionData).length,
           totalVisits: pageViews.length,
+          avgSessionDuration,
           popularPacks,
           peakHours,
+          regionData,
           engagementData: {
             totalEngagements: engagements.length,
             topEngagements: Object.entries(engagementCounts)
@@ -296,8 +349,10 @@ class PrivacyAnalytics {
         resolve({
           uniqueUsers: 0,
           totalVisits: 0,
+          avgSessionDuration: undefined,
           popularPacks: [],
           peakHours: [],
+          regionData: [],
           engagementData: {
             totalEngagements: 0,
             topEngagements: [],

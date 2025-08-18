@@ -5,8 +5,10 @@ import { useAnalytics } from '../services/analytics';
 interface AnalyticsSummary {
   uniqueUsers: number;
   totalVisits: number;
+  avgSessionDuration?: number;
   popularPacks: Array<{ name: string; views: number }>;
   peakHours: Array<{ hour: number; activity: number }>;
+  regionData?: Array<{ country: string; region: string; users: number }>;
   engagementData: {
     totalEngagements: number;
     topEngagements: Array<{ action: string; count: number }>;
@@ -129,11 +131,11 @@ export const AnalyticsDashboard: React.FC = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm">Avg. Session</p>
+                <p className="text-purple-100 text-sm">Avg. Session Duration</p>
                 <p className="text-2xl font-bold">
-                  {summary.uniqueUsers > 0 
-                    ? (summary.totalVisits / summary.uniqueUsers).toFixed(1)
-                    : '0'
+                  {summary.avgSessionDuration 
+                    ? `${Math.round(summary.avgSessionDuration / 60000)}m ${Math.round((summary.avgSessionDuration % 60000) / 1000)}s`
+                    : 'N/A'
                   }
                 </p>
               </div>
@@ -149,8 +151,9 @@ export const AnalyticsDashboard: React.FC = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm">Tracked Packs</p>
+                <p className="text-orange-100 text-sm">Unique Pack Types</p>
                 <p className="text-2xl font-bold">{summary.popularPacks.length}</p>
+                <p className="text-xs text-orange-200 mt-1">packs analyzed</p>
               </div>
               <div className="text-3xl opacity-80">📦</div>
             </div>
@@ -381,6 +384,81 @@ export const AnalyticsDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* User Regions */}
+      {summary.regionData && summary.regionData.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">🌍 User Regions</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">By Region</h4>
+              <div className="space-y-3">
+                {summary.regionData.slice(0, 8).map((region, index) => (
+                  <motion.div
+                    key={region.region}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg"
+                  >
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">
+                        {region.region === 'America' ? '🌎' : 
+                         region.region === 'Europe' ? '🌍' : 
+                         region.region === 'Asia' ? '🌏' : 
+                         region.region === 'Pacific' ? '🏝️' : '🌐'}
+                      </span>
+                      <div>
+                        <span className="font-medium text-gray-800 dark:text-gray-200">
+                          {region.region === 'America' ? 'Americas' : 
+                           region.region === 'Europe' ? 'Europe' : 
+                           region.region === 'Asia' ? 'Asia' : 
+                           region.region === 'Pacific' ? 'Pacific' : region.region}
+                        </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {region.users} {region.users === 1 ? 'user' : 'users'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-3">
+                        <div 
+                          className="bg-blue-500 h-2 rounded-full" 
+                          style={{ 
+                            width: `${(region.users / Math.max(...summary.regionData!.map(r => r.users))) * 100}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                        {Math.round((region.users / summary.uniqueUsers) * 100)}%
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">Global Reach</h4>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-4xl mb-2">🗺️</div>
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                    {summary.regionData.length}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    regions reached
+                  </div>
+                  <div className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+                    Based on user timezone data
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Privacy Notice */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
