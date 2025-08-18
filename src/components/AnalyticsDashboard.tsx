@@ -24,6 +24,13 @@ interface AnalyticsSummary {
       priceRangeDistribution: Record<string, number>;
     };
   };
+  advertiserInsights?: {
+    spendingTiers: Record<string, number>;
+    deviceBreakdown: Record<string, number>;
+    engagementRate: number;
+    returnVisitorRate: number;
+    avgPackValue: string;
+  };
 }
 
 export const AnalyticsDashboard: React.FC = () => {
@@ -396,106 +403,126 @@ export const AnalyticsDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Advertiser Insights */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">💼 Advertiser Insights</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Spending Behavior */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-lg">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">💰 Spending Behavior</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Casual Spenders (&lt;$10)</span>
-                  <span className="text-sm font-bold text-green-600">65%</span>
+        {/* Advertiser Insights - Only show with sufficient data */}
+        {summary.uniqueUsers >= 10 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">💼 Advertiser Insights</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Spending Behavior - Dynamic */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-lg">
+                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">💰 Spending Behavior</h4>
+                <div className="space-y-2">
+                  {summary.advertiserInsights?.spendingTiers ? (
+                    Object.entries(summary.advertiserInsights.spendingTiers).map(([tier, percentage]) => (
+                      <div key={tier} className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {tier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <span className="text-sm font-bold text-green-600">{percentage}%</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500">Collecting spending data...</p>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Moderate ($10-$50)</span>
-                  <span className="text-sm font-bold text-yellow-600">25%</span>
+              </div>
+
+              {/* Device & Timing - Dynamic */}
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-4 rounded-lg">
+                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">📱 Device & Timing</h4>
+                <div className="space-y-2">
+                  {summary.advertiserInsights?.deviceBreakdown ? (
+                    Object.entries(summary.advertiserInsights.deviceBreakdown).map(([device, percentage]) => (
+                      <div key={device} className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {device.charAt(0).toUpperCase() + device.slice(1)} Users
+                        </span>
+                        <span className="text-sm font-bold text-blue-600">{percentage}%</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500">Collecting device data...</p>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Avg Session</span>
+                    <span className="text-sm font-bold text-purple-600">
+                      {summary.avgSessionDuration ? `${Math.round(summary.avgSessionDuration / 1000 / 60)}m` : 'N/A'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Heavy ($50-$100)</span>
-                  <span className="text-sm font-bold text-orange-600">8%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Whale ($100+)</span>
-                  <span className="text-sm font-bold text-red-600">2%</span>
+              </div>
+
+              {/* Audience Quality - Dynamic */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg">
+                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">🎯 Audience Quality</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Engagement Rate</span>
+                    <span className="text-sm font-bold text-green-600">
+                      {summary.advertiserInsights?.engagementRate || 'N/A'}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Return Visitors</span>
+                    <span className="text-sm font-bold text-yellow-600">
+                      {summary.advertiserInsights?.returnVisitorRate || 'N/A'}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Gaming Focus</span>
+                    <span className="text-sm font-bold text-purple-600">100%</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Device & Timing */}
-            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-4 rounded-lg">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">📱 Device & Timing</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Mobile Users</span>
-                  <span className="text-sm font-bold text-blue-600">72%</span>
+            {/* Ad Placement Opportunities */}
+            <div className="mt-6 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">🚀 Prime Ad Placement Opportunities</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">🏆 Pack Analysis Results Page</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    High purchase intent - {summary.advertiserInsights?.avgPackValue || 'N/A'} avg pack value analyzed
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Desktop Users</span>
-                  <span className="text-sm font-bold text-blue-600">28%</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">📊 Value Calculator Page</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Decision-making stage - perfect for competing offers</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Peak Hours</span>
-                  <span className="text-sm font-bold text-purple-600">7-10 PM</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">🕐 Peak Hours</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    {summary.peakHours.length > 0 
+                      ? `${formatHour(summary.peakHours[0].hour)} - highest activity` 
+                      : 'Activity patterns emerging'}
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Avg Session</span>
-                  <span className="text-sm font-bold text-purple-600">
-                    {summary.avgSessionDuration ? `${Math.round(summary.avgSessionDuration / 1000 / 60)}m` : 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Audience Quality */}
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">🎯 Audience Quality</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Purchase Intent</span>
-                  <span className="text-sm font-bold text-green-600">High</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Engagement Rate</span>
-                  <span className="text-sm font-bold text-green-600">87%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Return Visitors</span>
-                  <span className="text-sm font-bold text-yellow-600">43%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Gaming Focus</span>
-                  <span className="text-sm font-bold text-purple-600">100%</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">📱 Mobile-Optimized</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    {summary.advertiserInsights?.deviceBreakdown?.mobile || 'N/A'}% mobile traffic
+                  </p>
                 </div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Ad Placement Opportunities */}
-          <div className="mt-6 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
-            <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">🚀 Prime Ad Placement Opportunities</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">🏆 Pack Analysis Results Page</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">High purchase intent moment - users just evaluated spending $5-$100</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">📊 Value Calculator Page</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Decision-making stage - perfect for competing offers</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">🕐 7-10 PM Peak Hours</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Maximum user activity - highest engagement window</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">📱 Mobile-First Experience</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">72% mobile traffic - optimize for mobile ad formats</p>
-              </div>
+        {/* Show preview message when data is insufficient */}
+        {summary.uniqueUsers < 10 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800 p-6">
+            <h3 className="text-xl font-semibold text-amber-800 dark:text-amber-200 mb-2">💼 Advertiser Insights</h3>
+            <p className="text-amber-700 dark:text-amber-300 mb-3">
+              Advanced advertiser insights will appear once you reach 10+ unique users.
+            </p>
+            <div className="text-sm text-amber-600 dark:text-amber-400">
+              <p>📊 Currently tracking: Spending behavior, device types, engagement patterns</p>
+              <p>🎯 Coming soon: Audience quality metrics, optimal ad placement timing</p>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Conversion Tracking */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">

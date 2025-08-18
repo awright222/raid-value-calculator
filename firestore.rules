@@ -50,6 +50,12 @@ service cloud.firestore {
       allow write: if true; // Allow users to submit inquiries and admin to manage them
     }
     
+    // Analytics collection - allow writes for data collection, reads for admin dashboard
+    match /analytics_events/{eventId} {
+      allow read: if true; // Allow admin dashboard to read analytics
+      allow write: if true; // Allow analytics collection from users (anonymized data only)
+    }
+    
     // Allow public write access for video analytics (anonymous usage tracking)
     // and admin read access for statistics
     match /video_analytics/{analyticsId} {
