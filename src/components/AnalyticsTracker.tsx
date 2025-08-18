@@ -9,6 +9,7 @@ export const AnalyticsTracker: React.FC<AnalyticsTrackerProps> = ({ activeTab })
   const analytics = useAnalytics();
 
   useEffect(() => {
+    console.log('📈 AnalyticsTracker: Initial page load, tab:', activeTab);
     // Track initial page load
     analytics.trackPageView('app_load', {
       initialTab: activeTab
@@ -16,6 +17,7 @@ export const AnalyticsTracker: React.FC<AnalyticsTrackerProps> = ({ activeTab })
   }, []);
 
   useEffect(() => {
+    console.log('📈 AnalyticsTracker: Tab changed to:', activeTab);
     // Track tab changes
     analytics.trackPageView(`tab_${activeTab}`, {
       tab: activeTab

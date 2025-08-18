@@ -5,16 +5,41 @@ import { checkRateLimit } from '../utils/rateLimiter';
 class PrivacyAnalytics {
   private sessionId: string;
   private hasConsent: (type: 'essential' | 'analytics' | 'advertising') => boolean;
+  private debugMode: boolean = false; // Set to true for debug logging
 
   constructor(hasConsentFn: (type: 'essential' | 'analytics' | 'advertising') => boolean) {
     this.hasConsent = hasConsentFn;
+    
+    // Initialize session immediately (don't wait for consent check)
     this.sessionId = this.generateSessionId();
-    this.initializeSession();
+    
+    // Only track events if we have consent, but always initialize session
+    if (this.hasConsent('analytics')) {
+      this.initializeSession();
+    }
   }
 
   private generateSessionId(): string {
-    // Generate a random session ID (not tied to user)
-    return 'sess_' + Math.random().toString(36).substr(2, 16) + '_' + Date.now();
+    // Check for existing session ID in sessionStorage (persists for browser tab)
+    const existingSessionId = sessionStorage.getItem('analytics_session_id');
+    const sessionStartTime = sessionStorage.getItem('analytics_session_start');
+    
+    // If session exists and is less than 30 minutes old, reuse it
+    if (existingSessionId && sessionStartTime) {
+      const sessionAge = Date.now() - parseInt(sessionStartTime);
+      const thirtyMinutes = 30 * 60 * 1000; // 30 minutes in milliseconds
+      
+      if (sessionAge < thirtyMinutes) {
+        return existingSessionId;
+      }
+    }
+    
+    // Generate new session ID
+    const newSessionId = 'sess_' + Math.random().toString(36).substr(2, 16) + '_' + Date.now();
+    sessionStorage.setItem('analytics_session_id', newSessionId);
+    sessionStorage.setItem('analytics_session_start', Date.now().toString());
+    
+    return newSessionId;
   }
 
   private initializeSession() {
@@ -28,11 +53,111 @@ class PrivacyAnalytics {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       language: navigator.language
     });
+
+    // Track session activity to calculate duration
+    this.trackSessionActivity();
+    
+    // Set up session end tracking
+    this.setupSessionEndTracking();
+  }
+
+  private trackSessionActivity() {
+    // Update session activity timestamp
+    sessionStorage.setItem('analytics_session_last_activity', Date.now().toString());
+  }
+
+  private setupSessionEndTracking() {
+    // Track session activity on user interactions
+    const activityEvents = ['click', 'scroll', 'keydown', 'mousemove'];
+    
+    const throttledActivity = this.throttle(() => {
+      this.trackSessionActivity();
+    }, 5000); // Only update every 5 seconds to reduce noise
+
+    activityEvents.forEach(eventType => {
+      document.addEventListener(eventType, throttledActivity, { passive: true });
+    });
+
+    // Track session end on page unload (unreliable but try anyway)
+    window.addEventListener('beforeunload', () => {
+      this.endSession();
+    });
+
+    // Track session end on visibility change (tab switch)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.endSession();
+      } else {
+        // User came back to tab, update activity
+        this.trackSessionActivity();
+      }
+    });
+
+    // Periodically end stale sessions (every 5 minutes)
+    setInterval(() => {
+      this.checkAndEndStaleSession();
+    }, 5 * 60 * 1000);
+  }
+
+  private throttle(func: Function, delay: number) {
+    let timeoutId: number;
+    let lastExecTime = 0;
+    return function(...args: any[]) {
+      const currentTime = Date.now();
+      
+      if (currentTime - lastExecTime > delay) {
+        func.apply(null, args);
+        lastExecTime = currentTime;
+      } else {
+        clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => {
+          func.apply(null, args);
+          lastExecTime = Date.now();
+        }, delay - (currentTime - lastExecTime));
+      }
+    };
+  }
+
+  private checkAndEndStaleSession() {
+    const lastActivity = sessionStorage.getItem('analytics_session_last_activity');
+    if (lastActivity) {
+      const timeSinceActivity = Date.now() - parseInt(lastActivity);
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (timeSinceActivity > fiveMinutes) {
+        // Session is stale, end it
+        this.endSession();
+      }
+    }
+  }
+
+  private endSession() {
+    if (!this.hasConsent('analytics')) return;
+
+    const sessionStart = sessionStorage.getItem('analytics_session_start');
+    const lastActivity = sessionStorage.getItem('analytics_session_last_activity');
+    
+    if (sessionStart && lastActivity) {
+      const duration = parseInt(lastActivity) - parseInt(sessionStart);
+      
+      // Only record session if it's longer than 10 seconds and less than 4 hours
+      if (duration > 10000 && duration < (4 * 60 * 60 * 1000)) {
+        this.trackEvent('session_end', {
+          sessionId: this.sessionId,
+          timestamp: Date.now(),
+          duration: duration,
+          sessionStart: parseInt(sessionStart),
+          sessionEnd: parseInt(lastActivity)
+        });
+      }
+    }
   }
 
   // Track page views
   trackPageView(page: string, additionalData?: Record<string, any>) {
     if (!this.hasConsent('analytics')) return;
+
+    this.trackSessionActivity(); // Update session activity timestamp
 
     this.trackEvent('page_view', {
       page,
@@ -43,7 +168,7 @@ class PrivacyAnalytics {
     });
   }
 
-  // Track pack interactions
+  // Track pack interactions with advertiser-valuable metrics
   trackPackView(packData: {
     packName: string;
     price: number;
@@ -52,15 +177,22 @@ class PrivacyAnalytics {
   }) {
     if (!this.hasConsent('analytics')) return;
 
+    this.trackSessionActivity(); // Update session activity timestamp
+    
     const priceRange = this.getPriceRange(packData.price);
+    const spendingTier = this.getSpendingTier(packData.price);
     
     this.trackEvent('pack_view', {
-      sessionId: this.sessionId,
       packName: packData.packName,
       priceRange: priceRange,
+      spendingTier: spendingTier,
       grade: packData.grade,
-      energyRange: this.getEnergyRange(packData.energyValue),
-      timestamp: Date.now()
+      energyValue: Math.round(packData.energyValue),
+      valuePerDollar: Math.round((packData.energyValue / packData.price) * 100) / 100,
+      sessionId: this.sessionId,
+      timestamp: Date.now(),
+      deviceType: this.getDeviceType(),
+      timeSpentOnSite: this.getTimeSpentOnSite()
     });
 
     // Also track as engagement for spending interest analysis
@@ -99,20 +231,34 @@ class PrivacyAnalytics {
 
   // Anonymize sensitive data
   private getPriceRange(price: number): string {
-    if (price < 5) return '$0-5';
-    if (price < 10) return '$5-10';
-    if (price < 25) return '$10-25';
-    if (price < 50) return '$25-50';
-    if (price < 100) return '$50-100';
-    return '$100+';
+    if (price < 5) return 'micro';
+    if (price < 20) return 'low';
+    if (price < 50) return 'medium';
+    if (price < 100) return 'high';
+    return 'premium';
   }
 
-  private getEnergyRange(energy: number): string {
-    if (energy < 500) return '0-500';
-    if (energy < 1000) return '500-1K';
-    if (energy < 2500) return '1K-2.5K';
-    if (energy < 5000) return '2.5K-5K';
-    return '5K+';
+  // New advertiser-valuable helper methods
+  private getSpendingTier(price: number): string {
+    if (price < 10) return 'casual_spender';
+    if (price < 50) return 'moderate_spender';
+    if (price < 100) return 'heavy_spender';
+    return 'whale_spender';
+  }
+
+  private getDeviceType(): string {
+    const userAgent = navigator.userAgent;
+    if (/tablet|ipad|playbook|silk/i.test(userAgent)) return 'tablet';
+    if (/mobile|iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(userAgent)) return 'mobile';
+    return 'desktop';
+  }
+
+  private getTimeSpentOnSite(): number {
+    const sessionStart = sessionStorage.getItem('analytics_session_start');
+    if (sessionStart) {
+      return Math.round((Date.now() - parseInt(sessionStart)) / 1000); // seconds
+    }
+    return 0;
   }
 
   // Send data to analytics service
@@ -131,7 +277,9 @@ class PrivacyAnalytics {
       // For now, we'll store locally and batch upload
       this.storeEventLocally(eventType, anonymizedData);
       
-      console.log(`📊 Analytics: ${eventType}`, anonymizedData);
+      if (this.debugMode) {
+        console.log(`📊 Analytics: ${eventType}`, anonymizedData);
+      }
     } catch (error) {
       console.warn('Analytics tracking failed:', error);
     }
@@ -201,9 +349,10 @@ class PrivacyAnalytics {
       try {
         const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
         
-        const sessionData: Record<string, { start: number; end: number; timezone?: string }> = {};
+        const sessionData: Record<string, { start: number; end: number; timezone?: string; duration?: number }> = {};
         const pageViews = events.filter((e: any) => e.eventType === 'page_view');
         const packViews = events.filter((e: any) => e.eventType === 'pack_view');
+        const sessionEndEvents = events.filter((e: any) => e.eventType === 'session_end');
         
         // Build session data and calculate durations
         events.forEach((event: any) => {
@@ -223,14 +372,31 @@ class PrivacyAnalytics {
           }
         });
 
-        // Calculate average session duration
-        const sessionDurations = Object.values(sessionData)
-          .map(session => session.end - session.start)
-          .filter(duration => duration > 0); // Filter out 0-duration sessions
+        // Use actual session durations from session_end events
+        sessionEndEvents.forEach((event: any) => {
+          const sessionId = event.data.sessionId;
+          if (sessionData[sessionId] && event.data.duration) {
+            sessionData[sessionId].duration = event.data.duration;
+          }
+        });
+
+        // Calculate average session duration using actual tracked durations
+        const realSessionDurations = sessionEndEvents
+          .map((event: any) => event.data.duration)
+          .filter((duration: number) => duration > 0 && duration < (60 * 60 * 1000)); // Filter out invalid durations (0 or > 1 hour)
           
-        const avgSessionDuration = sessionDurations.length > 0 
-          ? sessionDurations.reduce((sum, duration) => sum + duration, 0) / sessionDurations.length
+        const avgSessionDuration = realSessionDurations.length > 0 
+          ? realSessionDurations.reduce((sum: number, duration: number) => sum + duration, 0) / realSessionDurations.length
           : undefined;
+
+        // Only log in debug mode
+        if (this.debugMode) {
+          console.log('Session analysis:', {
+            totalSessions: Object.keys(sessionData).length,
+            sessionsWithDuration: realSessionDurations.length,
+            avgDuration: avgSessionDuration ? `${Math.round(avgSessionDuration / 1000)}s` : 'N/A'
+          });
+        }
 
         // Analyze region data from timezones
         const regionCounts: Record<string, number> = {};
