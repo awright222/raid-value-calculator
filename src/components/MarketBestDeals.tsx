@@ -51,16 +51,35 @@ export default function MarketBestDeals({ marketTrends, isDark }: MarketBestDeal
           : 'bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200'
       }`}
     >
-      <h2 className={`text-xl font-semibold mb-6 flex items-center gap-2 ${
-        isDark ? 'text-white' : 'text-gray-900'
-      }`}>
-        🏆 Best Deals
-        <span className={`text-sm font-normal ${
-          isDark ? 'text-gray-400' : 'text-gray-600'
+      <div className="flex items-center justify-between mb-6">
+        <h2 className={`text-xl font-semibold flex items-center gap-2 ${
+          isDark ? 'text-white' : 'text-gray-900'
         }`}>
-          • Updates weekly & monthly ({marketTrends.length} trends)
-        </span>
-      </h2>
+          🏆 Best Deals
+          <span className={`text-sm font-normal ${
+            isDark ? 'text-gray-400' : 'text-gray-600'
+          }`}>
+            • Updates weekly & monthly ({marketTrends.length} trends)
+          </span>
+        </h2>
+        
+        <button
+          onClick={() => {
+            console.log('🔄 Refreshing market trends...');
+            if ((window as any).refreshMarketTrends) {
+              (window as any).refreshMarketTrends();
+            }
+          }}
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+            isDark 
+              ? 'bg-orange-700 hover:bg-orange-600 text-orange-100' 
+              : 'bg-orange-200 hover:bg-orange-300 text-orange-800'
+          }`}
+          title="Refresh best deals data"
+        >
+          🔄 Refresh
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Weekly Best Deal */}

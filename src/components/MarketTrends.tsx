@@ -267,6 +267,7 @@ export default function MarketTrends() {
   const [error, setError] = useState<string | null>(null);
   const [actualTotalPacks, setActualTotalPacks] = useState<number>(0);
   const [marketTrends, setMarketTrends] = useState<MarketTrend[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const analytics = useAnalytics();
 
   // Helper function to create market trends from pack data
@@ -365,6 +366,20 @@ export default function MarketTrends() {
     analytics.trackPageView('market_trends', {
       feature: 'price_analysis'
     });
+  }, []);
+
+  // Add a method to refresh data that can be called externally
+  const refreshMarketData = async () => {
+    console.log('🔄 MarketTrends: Manual refresh triggered');
+    await loadMarketData();
+  };
+
+  // Expose refresh method globally for other components to use
+  useEffect(() => {
+    (window as any).refreshMarketTrends = refreshMarketData;
+    return () => {
+      delete (window as any).refreshMarketTrends;
+    };
   }, []);
 
   const loadMarketData = async () => {
@@ -639,6 +654,7 @@ export default function MarketTrends() {
       console.log('📊 Sample prices:', trends.slice(0, 3).map(t => `${t.itemName}: $${t.currentPrice.toFixed(4)}`));
       
       setItemTrends(trends);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('❌ MarketTrends: Failed to load market data:', error);
       setError('Failed to load market data. Please try again.');
@@ -681,16 +697,42 @@ export default function MarketTrends() {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className={`text-3xl font-bold mb-2 ${
-          isDark ? 'text-white' : 'text-gray-900'
-        }`}>
-          Market Trends
-        </h1>
-        <p className={`text-lg ${
-          isDark ? 'text-gray-300' : 'text-gray-600'
-        }`}>
-          Interactive price cards with flip animations to explore item value trends and market insights
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-3xl font-bold mb-2 ${
+              isDark ? 'text-white' : 'text-gray-900'
+            }`}>
+              Market Trends
+            </h1>
+            <p className={`text-lg ${
+              isDark ? 'text-gray-300' : 'text-gray-600'
+            }`}>
+              Interactive price cards with flip animations to explore item value trends and market insights
+            </p>
+          </div>
+          <div className="text-right">
+            {lastUpdated && (
+              <div className={`text-sm ${
+                isDark ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
+            <button
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered from header');
+                loadMarketData();
+              }}
+              className={`mt-1 px-3 py-1 rounded-lg text-sm transition-colors ${
+                isDark 
+                  ? 'bg-blue-700 hover:bg-blue-600 text-blue-100' 
+                  : 'bg-blue-200 hover:bg-blue-300 text-blue-800'
+              }`}
+            >
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
       </motion.div>
 
       {/* Market Intelligence Summary */}

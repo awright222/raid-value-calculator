@@ -321,6 +321,15 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       setSuccess(`Pack "${formData.name}" added successfully!`);
       setValidationWarnings([]); // Clear any previous warnings
       
+      // Refresh market trends data after successful pack addition
+      console.log('🔄 AdminPanel: Triggering market trends refresh after pack addition');
+      if ((window as any).refreshMarketTrends) {
+        // Add a small delay to ensure database write has completed
+        setTimeout(() => {
+          (window as any).refreshMarketTrends();
+        }, 1000);
+      }
+      
       // Reset form on success
       setFormData({ name: '', price: '' });
       setPackItems([]);
@@ -442,6 +451,18 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
     setSuccess(`Import complete: ${successCount} successful, ${errorCount} failed`);
     setBulkData('');
     setBulkPreview([]);
+    
+    // Refresh market trends data after successful bulk import
+    if (successCount > 0) {
+      console.log('🔄 AdminPanel: Triggering market trends refresh after bulk import');
+      if ((window as any).refreshMarketTrends) {
+        // Add a small delay to ensure database writes have completed
+        setTimeout(() => {
+          (window as any).refreshMarketTrends();
+        }, 1500);
+      }
+    }
+    
     onPackAdded();
   };
 
@@ -451,6 +472,16 @@ function AdminPanel({ onPackAdded }: AdminPanelProps) {
       const success = await approvePendingPack(packId);
       if (success) {
         setSuccess('Pack approved successfully!');
+        
+        // Refresh market trends data after successful pack approval
+        console.log('🔄 AdminPanel: Triggering market trends refresh after pack approval');
+        if ((window as any).refreshMarketTrends) {
+          // Add a small delay to ensure database write has completed
+          setTimeout(() => {
+            (window as any).refreshMarketTrends();
+          }, 1000);
+        }
+        
         await loadPendingPacks();
         onPackAdded();
       } else {

@@ -146,6 +146,15 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
           price: 0,
           items: []
         });
+
+        // Refresh market trends data after successful submission
+        console.log('🔄 PackSubmission: Triggering market trends refresh after successful pack submission');
+        if ((window as any).refreshMarketTrends) {
+          // Add a small delay to ensure database write has completed
+          setTimeout(() => {
+            (window as any).refreshMarketTrends();
+          }, 1000);
+        }
         
         onSubmissionComplete?.(true, result.message);
       } else {
