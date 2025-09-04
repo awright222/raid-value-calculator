@@ -36,7 +36,7 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
   const totalEnergy = energyPots * 130 + rawEnergy;
   const costPerEnergy = totalEnergy > 0 ? formData.price / totalEnergy : 0;
 
-  const handleInputChange = (field: keyof PackFormData, value: any) => {
+  const handleInputChange = (field: keyof PackFormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setSubmitMessage(null); // Clear any previous messages
   };
