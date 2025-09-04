@@ -272,46 +272,66 @@ export default function MarketTrends() {
       if (periodPacks.length === 0) return null;
 
       // Find best deal (lowest cost per energy)
-      const packsWithCostPerEnergy = periodPacks.map((pack: any) => {
-        // Calculate cost per energy for each pack
-        const totalEnergy = pack.items?.reduce((sum: number, item: any) => {
-          if (item.itemTypeId === 'energy_pot') return sum + (item.quantity * 130);
-          if (item.itemTypeId === 'energy') return sum + item.quantity;
-          return sum;
-        }, 0) || 1;
+      // Calculate item prices once and reuse for all packs (performance optimization)
+      const { calculateItemPrices } = await import('../services/pricingService');
+      const { itemPrices } = await calculateItemPrices();
+      
+      const packsWithValueGrades = periodPacks.map((pack: any) => {
+        // Calculate total market value of all items in the pack (like PackAnalyzer)
+        let totalMarketValue = 0;
+        let totalEnergy = 0;
         
-        const costPerEnergy = pack.price / Math.max(totalEnergy, 1);
+        if (pack.items && Array.isArray(pack.items)) {
+          pack.items.forEach((item: any) => {
+            const marketPrice = itemPrices[item.itemTypeId] || 0;
+            totalMarketValue += marketPrice * item.quantity;
+            
+            // Also track energy for energy-focused packs
+            if (item.itemTypeId === 'energy_pot') totalEnergy += item.quantity * 130;
+            if (item.itemTypeId === 'energy') totalEnergy += item.quantity;
+          });
+        }
         
-        // Simple grading based on cost per energy
-  let grade = 'F';
-  if (costPerEnergy <= 0.0025) grade = 'SSS';
-  else if (costPerEnergy <= 0.0035) grade = 'S+';
-  else if (costPerEnergy <= 0.005) grade = 'S';
-  else if (costPerEnergy <= 0.008) grade = 'A';
-  else if (costPerEnergy <= 0.012) grade = 'B';
-  else if (costPerEnergy <= 0.016) grade = 'C';
-  else if (costPerEnergy <= 0.020) grade = 'D';
-
+        // Calculate value ratio (like PackAnalyzer does)
+        const valueRatio = totalMarketValue > 0 ? totalMarketValue / pack.price : 0;
+        
+        // Debug logging to track grading
+        console.log(`📊 ${pack.display_name || pack.name}: Market Value=$${totalMarketValue.toFixed(2)}, Price=$${pack.price}, Ratio=${valueRatio.toFixed(3)}`);
+        
+        // Use the EXACT same grading logic as analyzePackValueNew for consistency
+        let grade = 'F';
+        if (valueRatio >= 2.0) grade = 'SSS';        // 200%+ value (matches analyzePackValueNew)
+        else if (valueRatio >= 1.5) grade = 'S';     // 150%+ value
+        else if (valueRatio >= 1.3) grade = 'A';
+        else if (valueRatio >= 1.1) grade = 'B';
+        else if (valueRatio >= 0.9) grade = 'C';
+        else if (valueRatio >= 0.7) grade = 'D';
+        
+        console.log(`   → Final grade: ${grade}`);
+        
+        // For energy-only packs, also check cost per energy as fallback
+        const costPerEnergy = totalEnergy > 0 ? pack.price / totalEnergy : Infinity;
+        
         return {
           ...pack,
+          valueRatio,
+          totalMarketValue,
+          totalEnergy,
           costPerEnergy,
           grade,
-          totalEnergy,
-          packName: pack.display_name || pack.name || 'Unknown Pack' // Use the actual pack name fields
+          packName: pack.display_name || pack.name || 'Unknown Pack'
         };
       });
 
-      // Sort by cost per energy (lowest first = best deals)
-      packsWithCostPerEnergy.sort((a: any, b: any) => a.costPerEnergy - b.costPerEnergy);
-      const bestDeal = packsWithCostPerEnergy[0];
-      const worstDeal = packsWithCostPerEnergy[packsWithCostPerEnergy.length - 1];
+      // Sort by value ratio (highest first = best deals)
+      packsWithValueGrades.sort((a: any, b: any) => b.valueRatio - a.valueRatio);
+      const bestDeal = packsWithValueGrades[0];
+      const worstDeal = packsWithValueGrades[packsWithValueGrades.length - 1];
 
       // Calculate average grade
-  const gradeValues = { 'SSS': 8, 'S+': 7, 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
-      const avgGradeValue = packsWithCostPerEnergy.reduce((sum: number, pack: any) => 
-        sum + (gradeValues[pack.grade as keyof typeof gradeValues] || 1), 0) / packsWithCostPerEnergy.length;
-      
-      const gradeLetters = Object.keys(gradeValues) as (keyof typeof gradeValues)[];
+      const gradeValues = { 'SSS': 8, 'S+': 7, 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+      const avgGradeValue = packsWithValueGrades.reduce((sum: number, pack: any) =>
+        sum + (gradeValues[pack.grade as keyof typeof gradeValues] || 1), 0) / packsWithValueGrades.length;      const gradeLetters = Object.keys(gradeValues) as (keyof typeof gradeValues)[];
       const avgGrade = gradeLetters.find(grade => gradeValues[grade] <= avgGradeValue + 0.5) || 'F';
 
       const trend: MarketTrend = {
@@ -320,7 +340,7 @@ export default function MarketTrends() {
         periodEnd: Timestamp.fromDate(now),
         totalPacksAnalyzed: periodPacks.length,
         averageGrade: avgGrade,
-        averageCostPerEnergy: packsWithCostPerEnergy.reduce((sum: number, pack: any) => sum + pack.costPerEnergy, 0) / packsWithCostPerEnergy.length,
+        averageCostPerEnergy: packsWithValueGrades.reduce((sum: number, pack: any) => sum + pack.costPerEnergy, 0) / packsWithValueGrades.length,
         bestDeal: {
           packName: bestDeal.packName || 'Unknown Pack',
           grade: bestDeal.grade,
