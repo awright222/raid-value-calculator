@@ -146,15 +146,6 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
           price: 0,
           items: []
         });
-
-        // Refresh market trends data after successful submission
-        console.log('🔄 PackSubmission: Triggering market trends refresh after successful pack submission');
-        if ((window as any).refreshMarketTrends) {
-          // Add a small delay to ensure database write has completed
-          setTimeout(() => {
-            (window as any).refreshMarketTrends();
-          }, 1000);
-        }
         
         onSubmissionComplete?.(true, result.message);
       } else {
@@ -328,9 +319,19 @@ export function PackSubmission({ onSubmissionComplete }: PackSubmissionProps) {
                   id={`item-quantity-${index}`}
                   name={`item-quantity-${index}`}
                   type="number"
-                  min="1"
-                  value={item.quantity || ''}
-                  onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
+                  min="0"
+                  value={item.quantity === 0 ? '' : item.quantity}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // Allow empty string for clearing
+                    if (val === '' || val === undefined) {
+                      handleItemChange(index, 'quantity', '');
+                    } else {
+                      // Prevent leading zeros
+                      const clean = val.replace(/^0+(?!$)/, '');
+                      handleItemChange(index, 'quantity', clean === '' ? '' : parseInt(clean));
+                    }
+                  }}
                   placeholder="Quantity"
                   className="px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full"
                 />

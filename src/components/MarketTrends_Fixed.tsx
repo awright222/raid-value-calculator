@@ -254,8 +254,8 @@ export default function MarketTrends() {
   const [marketTrends, setMarketTrends] = useState<MarketTrend[]>([]);
   const analytics = useAnalytics();
 
-  // Helper function to create market trends from Firebase pack data
-  const createTrendFromPacks = async (packs: any[], period: 'weekly' | 'monthly'): Promise<MarketTrend | null> => {
+  // Helper function to create market trends from local SQLite pack data
+  const createTrendFromLocalPacks = async (packs: any[], period: 'weekly' | 'monthly'): Promise<MarketTrend | null> => {
     try {
       if (packs.length === 0) return null;
 
@@ -263,41 +263,38 @@ export default function MarketTrends() {
       const periodDays = period === 'weekly' ? 7 : 30;
       const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
       
-      // Filter packs for this period - Firebase packs have created_at as Timestamp
+      // Filter packs for this period - SQLite packs have created_at as string
       const periodPacks = packs.filter((pack: any) => {
-        const packDate = pack.created_at?.toDate() || new Date(0);
+        const packDate = new Date(pack.created_at);
         return packDate >= periodStart;
       });
 
       if (periodPacks.length === 0) return null;
 
-      // Find best deal (lowest cost per energy)
+      // Find best deal (lowest cost per energy) - data already available in SQLite
       const packsWithCostPerEnergy = periodPacks.map((pack: any) => {
-        // Calculate cost per energy for each pack
-        const totalEnergy = pack.items?.reduce((sum: number, item: any) => {
-          if (item.itemTypeId === 'energy_pot') return sum + (item.quantity * 130);
-          if (item.itemTypeId === 'energy') return sum + item.quantity;
-          return sum;
-        }, 0) || 1;
-        
-        const costPerEnergy = pack.price / Math.max(totalEnergy, 1);
+        // SQLite packs already have cost_per_energy calculated
+        const costPerEnergy = pack.cost_per_energy;
         
         // Simple grading based on cost per energy
-  let grade = 'F';
-  if (costPerEnergy <= 0.0025) grade = 'SSS';
-  else if (costPerEnergy <= 0.0035) grade = 'S+';
-  else if (costPerEnergy <= 0.005) grade = 'S';
-  else if (costPerEnergy <= 0.008) grade = 'A';
-  else if (costPerEnergy <= 0.012) grade = 'B';
-  else if (costPerEnergy <= 0.016) grade = 'C';
-  else if (costPerEnergy <= 0.020) grade = 'D';
+        let grade = 'F';
+        if (costPerEnergy <= 0.005) grade = 'S';
+        else if (costPerEnergy <= 0.008) grade = 'A';
+        else if (costPerEnergy <= 0.012) grade = 'B';
+        else if (costPerEnergy <= 0.016) grade = 'C';
+        else if (costPerEnergy <= 0.020) grade = 'D';
 
         return {
           ...pack,
           costPerEnergy,
           grade,
-          totalEnergy,
-          packName: pack.display_name || pack.name || 'Unknown Pack' // Use the actual pack name fields
+          totalEnergy: pack.total_energy,
+          packName: pack.name, // SQLite uses 'name' field directly
+          // Convert SQLite structure to items array for display
+          items: [
+            ...(pack.energy_pots > 0 ? [{ itemTypeId: 'energy_pot', quantity: pack.energy_pots, itemName: 'Energy Pot' }] : []),
+            ...(pack.raw_energy > 0 ? [{ itemTypeId: 'raw_energy', quantity: pack.raw_energy, itemName: 'Raw Energy' }] : [])
+          ]
         };
       });
 
@@ -307,7 +304,7 @@ export default function MarketTrends() {
       const worstDeal = packsWithCostPerEnergy[packsWithCostPerEnergy.length - 1];
 
       // Calculate average grade
-  const gradeValues = { 'SSS': 8, 'S+': 7, 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
+      const gradeValues = { 'S': 6, 'A': 5, 'B': 4, 'C': 3, 'D': 2, 'F': 1 };
       const avgGradeValue = packsWithCostPerEnergy.reduce((sum: number, pack: any) => 
         sum + (gradeValues[pack.grade as keyof typeof gradeValues] || 1), 0) / packsWithCostPerEnergy.length;
       
@@ -341,7 +338,7 @@ export default function MarketTrends() {
 
       return trend;
     } catch (error) {
-      console.error(`Error creating ${period} trend from Firebase data:`, error);
+      console.error(`Error creating ${period} trend from local data:`, error);
       return null;
     }
   };
@@ -365,26 +362,26 @@ export default function MarketTrends() {
       const { itemPrices, totalPacks } = await calculateItemPrices();
       console.log(`📦 MarketTrends: Loaded prices for ${Object.keys(itemPrices).length} items from ${totalPacks} packs`);
       
-      // Load market trends data for best deals from Firebase
+      // Load market trends data for best deals from local SQLite database
       let marketTrendsData = await getLatestMarketTrends();
       console.log(`📈 MarketTrends: Loaded ${marketTrendsData.length} existing market trends`);
       
-      // If no trends exist, create them directly from Firebase packs data
+      // If no trends exist, create them directly from local packs data
       if (marketTrendsData.length === 0) {
-        console.log('🔄 MarketTrends: No trends found, creating from Firebase pack data...');
+        console.log('🔄 MarketTrends: No trends found, creating from local pack data...');
         try {
-          // Import the getAllPacks function to get actual pack data from Firebase
-          const { getAllPacks } = await import('../firebase/database');
-          const allPacks = await getAllPacks();
-          console.log(`📊 MarketTrends: Found ${allPacks.length} total packs from Firebase`);
+          // Get actual pack data from local SQLite database via API
+          const response = await fetch('/api/packs');
+          const allPacks = await response.json();
+          console.log(`📊 MarketTrends: Found ${allPacks.length} total packs from local database`);
           
           if (allPacks.length > 0) {
-            // Filter recent packs (last 30 days) - Firebase packs have created_at as Timestamp
+            // Filter recent packs (last 30 days) - SQLite packs have created_at as string
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             
             const recentPacks = allPacks.filter((pack: any) => {
-              const packDate = pack.created_at?.toDate() || new Date(0);
+              const packDate = new Date(pack.created_at);
               return packDate >= thirtyDaysAgo;
             });
             
@@ -394,14 +391,13 @@ export default function MarketTrends() {
               // Debug: Log sample pack structure
               console.log('📋 Sample pack structure:', {
                 name: recentPacks[0].name,
-                display_name: recentPacks[0].display_name,
                 price: recentPacks[0].price,
                 keys: Object.keys(recentPacks[0])
               });
               
-              // Create simplified trends from pack data
-              const weeklyTrend = await createTrendFromPacks(recentPacks, 'weekly');
-              const monthlyTrend = await createTrendFromPacks(recentPacks, 'monthly');
+              // Create simplified trends from pack data - adapt for SQLite structure
+              const weeklyTrend = await createTrendFromLocalPacks(recentPacks, 'weekly');
+              const monthlyTrend = await createTrendFromLocalPacks(recentPacks, 'monthly');
               
               marketTrendsData = [weeklyTrend, monthlyTrend].filter((trend): trend is MarketTrend => trend !== null);
               console.log(`✅ MarketTrends: Generated ${marketTrendsData.length} trends from pack data`);
@@ -416,23 +412,23 @@ export default function MarketTrends() {
       setActualTotalPacks(totalPacks);
       setMarketTrends(marketTrendsData);
       
-      // Create price trends with REAL historical data from Firebase
-      console.log('📊 MarketTrends: Building historical trends from Firebase data...');
+      // Create price trends with REAL historical data from local SQLite database
+      console.log('📊 MarketTrends: Building historical trends from local database...');
       const trends: ItemPriceTrend[] = [];
       
-      // Get all packs from the last 30 days to build real historical data from Firebase
-      const { getAllPacks } = await import('../firebase/database');
-      const allPacks = await getAllPacks();
+      // Get all packs from the last 30 days to build real historical data from local database
+      const response = await fetch('/api/packs');
+      const allPacks = await response.json();
       
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       const recentPacks = allPacks.filter((pack: any) => {
-        const packDate = pack.created_at?.toDate() || new Date(0);
-        return packDate >= thirtyDaysAgo && pack.items && pack.items.length > 0;
+        const packDate = new Date(pack.created_at);
+        return packDate >= thirtyDaysAgo;
       });
       
-      console.log(`📦 MarketTrends: Using ${recentPacks.length} recent packs from Firebase for historical analysis`);
+      console.log(`📦 MarketTrends: Using ${recentPacks.length} recent packs from local database for historical analysis`);
       
       for (const [itemTypeId, currentPrice] of Object.entries(itemPrices)) {
         // Get proper item names
@@ -446,52 +442,76 @@ export default function MarketTrends() {
         else if (itemTypeId === 'ancient_shard') itemName = 'Ancient Shard';
         else if (itemTypeId === 'mystery_shard') itemName = 'Mystery Shard';
         
-        // For Firebase data, we'll create trends for items that appear in pack data
+        // For SQLite data, we'll create trends for energy_pot and raw_energy (the main items)
         const priceHistory = [];
         
-        // Find packs containing this item type from Firebase data
-        const packsWithItem = recentPacks.filter((pack: any) => {
-          if (!pack.items || !Array.isArray(pack.items)) return false;
-          return pack.items.some((item: any) => item.itemTypeId === itemTypeId && item.quantity > 0);
-        });
-        
-        console.log(`🔍 ${itemName}: Found ${packsWithItem.length} packs with this item in Firebase data`);
-        
-        // Build daily price history for the last 7 days - ONLY include days with actual data
-        const today = new Date();
-        
-        for (let i = 6; i >= 0; i--) {
-          const targetDate = new Date(today);
-          targetDate.setDate(today.getDate() - i);
-          
-          // Find packs from this day (±12 hours)
-          const dayStart = new Date(targetDate);
-          dayStart.setHours(0, 0, 0, 0);
-          const dayEnd = new Date(targetDate);
-          dayEnd.setHours(23, 59, 59, 999);
-          
-          const dayPacks = packsWithItem.filter((pack: any) => {
-            // Firebase packs have created_at as Timestamp
-            const packDate = pack.created_at?.toDate() || new Date(0);
-            return packDate >= dayStart && packDate <= dayEnd;
+        if (itemTypeId === 'energy_pot' || itemTypeId === 'raw_energy') {
+          // Find packs containing this item type from SQLite data
+          const packsWithItem = recentPacks.filter((pack: any) => {
+            if (itemTypeId === 'energy_pot' && pack.energy_pots > 0) return true;
+            if (itemTypeId === 'raw_energy' && pack.raw_energy > 0) return true;
+            return false;
           });
           
-          // ONLY add to price history if we have actual data for this day
-          if (dayPacks.length > 0) {
-            // Use the current calculated price as estimate for historical data
-            const dayPrice = currentPrice;
+          console.log(`🔍 ${itemName}: Found ${packsWithItem.length} packs with this item in SQLite data`);
+          
+          // Build daily price history for the last 7 days - ONLY include days with actual data
+          const today = new Date();
+          
+          for (let i = 6; i >= 0; i--) {
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() - i);
             
-            // Add this day to price history (only when we have actual pack data)
-            priceHistory.push({
-              date: targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-              price: Math.max(0.0001, dayPrice),
-              confidence: Math.min(95, dayPacks.length * 25) // High confidence since we have real data
+            // Find packs from this day (±12 hours)
+            const dayStart = new Date(targetDate);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(targetDate);
+            dayEnd.setHours(23, 59, 59, 999);
+            
+            const dayPacks = packsWithItem.filter((pack: any) => {
+              const packDate = new Date(pack.created_at);
+              return packDate >= dayStart && packDate <= dayEnd;
             });
             
-            console.log(`✅ ${itemName} added data point for ${targetDate.toLocaleDateString()}: $${dayPrice.toFixed(4)} (${dayPacks.length} packs)`);
-          } else {
-            console.log(`⏭️ ${itemName} no packs found for ${targetDate.toLocaleDateString()}, skipping data point`);
+            // ONLY add to price history if we have actual data for this day
+            if (dayPacks.length > 0) {
+              // For SQLite data, we use the current price as a stable estimate
+              // since the packs don't have individual item breakdown
+              const dayPrice = currentPrice;
+              
+              // Add this day to price history (only when we have actual pack data)
+              priceHistory.push({
+                date: targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                price: Math.max(0.0001, dayPrice),
+                confidence: Math.min(95, dayPacks.length * 25) // High confidence since we have real data
+              });
+              
+              console.log(`✅ ${itemName} added data point for ${targetDate.toLocaleDateString()}: $${dayPrice.toFixed(4)} (${dayPacks.length} packs)`);
+            } else {
+              console.log(`⏭️ ${itemName} no packs found for ${targetDate.toLocaleDateString()}, skipping data point`);
+            }
           }
+        } else {
+          // For other item types not directly in SQLite, create basic trend from current price
+          console.log(`📊 ${itemName} not in SQLite data, creating basic trend from current price`);
+          
+          const today = new Date();
+          for (let i = 2; i >= 0; i--) {
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() - i);
+            
+            let trendPrice = currentPrice;
+            if (i === 2) trendPrice = currentPrice * 0.98; // 2% lower 2 days ago
+            else if (i === 1) trendPrice = currentPrice * 0.99; // 1% lower yesterday  
+            else trendPrice = currentPrice; // Current price today
+            
+            priceHistory.push({
+              date: targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              price: Math.max(0.0001, trendPrice),
+              confidence: 30 // Lower confidence for non-SQLite items
+            });
+          }
+          console.log(`🔧 ${itemName} created basic trend for non-SQLite item:`, priceHistory.map(p => `${p.date}: $${p.price.toFixed(4)}`).join(', '));
         }
         
         // If we have very little historical data, create a reasonable trend using current price
