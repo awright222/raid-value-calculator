@@ -395,6 +395,50 @@ export const ITEM_TYPES: ItemType[] = [
     name: 'Tag Team Arena Refill',
     category: ITEM_CATEGORIES.FARMING,
     description: 'Refill for Tag Team Arena battles'
+  },
+
+  // Basalt Items
+  {
+    id: 'basalt_rank_one',
+    name: 'Basalt (Rank One)',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Rank One Basalt for gear enhancement',
+    utilityScore: 6,
+    utilityReasoning: 'Essential for gear enhancement progression'
+  },
+  {
+    id: 'basalt_rank_two',
+    name: 'Basalt (Rank Two)',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Rank Two Basalt for gear enhancement',
+    utilityScore: 7,
+    utilityReasoning: 'Higher tier material for advanced gear enhancement'
+  },
+  {
+    id: 'basalt_rank_three',
+    name: 'Basalt (Rank Three)',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Rank Three Basalt for gear enhancement',
+    utilityScore: 8,
+    utilityReasoning: 'High-tier material for advanced gear enhancement'
+  },
+  {
+    id: 'basalt_rank_four',
+    name: 'Basalt (Rank Four)',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Rank Four Basalt for gear enhancement',
+    utilityScore: 9,
+    utilityReasoning: 'Premium material for top-tier gear enhancement'
+  },
+
+  // Starstone
+  {
+    id: 'starstone',
+    name: 'Starstone',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Starstone for advanced gear enhancement',
+    utilityScore: 8,
+    utilityReasoning: 'Valuable material for high-level gear enhancement'
   }
 ];
 
