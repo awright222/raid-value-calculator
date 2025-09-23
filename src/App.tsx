@@ -15,7 +15,11 @@ import { CookieConsent } from './components/CookieConsent';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'community' | 'trends' | 'contact' | 'admin'>('analyze');
+  // Initialize activeTab from localStorage or default to 'analyze'
+  const [activeTab, setActiveTab] = useState<'analyze' | 'values' | 'community' | 'trends' | 'contact' | 'admin'>(() => {
+    const savedTab = localStorage.getItem('activeTab');
+    return (savedTab as any) || 'analyze';
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBiometricLogin, setShowBiometricLogin] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
@@ -34,6 +38,11 @@ function App() {
       setShowAdminTab(true);
     }
   }, []);
+
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   // Secret keyboard shortcut to show admin tab (Ctrl+Shift+A)
   useEffect(() => {
