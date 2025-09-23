@@ -439,6 +439,16 @@ export const ITEM_TYPES: ItemType[] = [
     description: 'Starstone for advanced gear enhancement',
     utilityScore: 8,
     utilityReasoning: 'Valuable material for high-level gear enhancement'
+  },
+
+  // Magnificent Artifact Chest
+  {
+    id: 'magnificent_artifact_chest',
+    name: 'Magnificent Artifact Chest',
+    category: ITEM_CATEGORIES.GEAR_ASCENSION,
+    description: 'Premium chest containing high-quality artifacts',
+    utilityScore: 8,
+    utilityReasoning: 'High-value chest with excellent gear potential'
   }
 ];
 
