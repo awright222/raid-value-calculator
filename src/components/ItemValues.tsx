@@ -39,7 +39,7 @@ export default function ItemValues() {
       }
 
       // Use the shared pricing service
-      const { itemStats, totalPacks } = await calculateItemPrices(isRefresh);
+      const { itemStats, totalPacks } = await calculateItemPrices();
       setTotalPacks(totalPacks);
 
       // Convert to ItemValue array

@@ -99,9 +99,8 @@ export default function PackAnalyzer({}: PackAnalyzerProps) {
       }
       
       // Use the shared pricing service that has the advanced algorithm
-      const { itemPrices, itemStats } = await calculateItemPrices(isRefresh);
-      
-      setItemPrices(itemPrices);
+      const itemPricesResult = await calculateItemPrices();
+      setItemPrices(itemPricesResult);
       
       // Create a simplified stats object for confidence indicators
       const statsForConfidence: Record<string, { totalQuantity: number; packCount: number }> = {};
