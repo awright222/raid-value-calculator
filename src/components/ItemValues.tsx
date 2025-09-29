@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { savePriceSnapshot } from '../firebase/historical';
-import { calculateItemPrices, clearPricingCache } from '../services/pricingService';
+import { calculateItemPricesWithStats, clearPricingCache } from '../services/pricingService';
 import { maybeCreateMarketSnapshot } from '../services/marketTrackingService';
 import { useAnalytics } from '../services/analytics';
 import { ITEM_TYPES, getItemTypeById, getUtilityScore, calculateUtilityAdjustedPrice } from '../types/itemTypes';
@@ -39,7 +39,7 @@ export default function ItemValues() {
       }
 
       // Use the shared pricing service
-      const { itemStats, totalPacks } = await calculateItemPrices();
+      const { itemStats, totalPacks } = await calculateItemPricesWithStats();
       setTotalPacks(totalPacks);
 
       // Convert to ItemValue array

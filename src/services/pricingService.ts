@@ -526,6 +526,30 @@ export const calculateItemPrices = async (): Promise<Record<string, number>> => 
 };
 
 /**
+ * Calculate item prices with full stats - for Item Values component
+ */
+export const calculateItemPricesWithStats = async (): Promise<{
+  itemPrices: Record<string, number>;
+  itemStats: Record<string, { totalCost: number; totalQuantity: number; packCount: number }>;
+  totalPacks: number;
+}> => {
+  // Use the cached result if available
+  if (pricingCache) {
+    return pricingCache;
+  }
+  
+  // Call the main function to populate cache
+  await calculateItemPrices();
+  
+  // Return the full cached result
+  return pricingCache || {
+    itemPrices: {},
+    itemStats: {},
+    totalPacks: 0
+  };
+};
+
+/**
  * Analyze pack value using dynamic pricing instead of energy-based comparison
  */
 export const analyzePackValueNew = async (
