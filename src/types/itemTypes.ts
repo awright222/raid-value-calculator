@@ -173,6 +173,70 @@ export const ITEM_TYPES: ItemType[] = [
     description: 'Superior ascension potion for Void affinity champions'
   },
 
+  // Greater Ascension Potions
+  {
+    id: 'greater_arcane_potion',
+    name: 'Greater Arcane Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Greater ascension potion for Arcane affinity champions'
+  },
+  {
+    id: 'greater_spirit_potion',
+    name: 'Greater Spirit Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Greater ascension potion for Spirit affinity champions'
+  },
+  {
+    id: 'greater_magic_potion',
+    name: 'Greater Magic Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Greater ascension potion for Magic affinity champions'
+  },
+  {
+    id: 'greater_force_potion',
+    name: 'Greater Force Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Greater ascension potion for Force affinity champions'
+  },
+  {
+    id: 'greater_void_potion',
+    name: 'Greater Void Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Greater ascension potion for Void affinity champions'
+  },
+
+  // Lesser Ascension Potions
+  {
+    id: 'lesser_arcane_potion',
+    name: 'Lesser Arcane Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Lesser ascension potion for Arcane affinity champions'
+  },
+  {
+    id: 'lesser_spirit_potion',
+    name: 'Lesser Spirit Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Lesser ascension potion for Spirit affinity champions'
+  },
+  {
+    id: 'lesser_magic_potion',
+    name: 'Lesser Magic Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Lesser ascension potion for Magic affinity champions'
+  },
+  {
+    id: 'lesser_force_potion',
+    name: 'Lesser Force Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Lesser ascension potion for Force affinity champions'
+  },
+  {
+    id: 'lesser_void_potion',
+    name: 'Lesser Void Potion',
+    category: ITEM_CATEGORIES.ASCENSION,
+    description: 'Lesser ascension potion for Void affinity champions'
+  },
+
   // Gear Ascension Items
   {
     id: 'lesser_oil',

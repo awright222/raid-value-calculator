@@ -58,10 +58,17 @@ export default function ItemAutocomplete({
       setSelectedIndex(-1);
       setSearchTerm('');
     } else {
-      // Focus search input when modal opens
+      // Clear search term and focus input when modal opens
+      setSearchTerm('');
+      setSelectedIndex(-1);
+      // Use a slightly longer timeout to ensure DOM is ready
       setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          // Ensure the input is ready for typing
+          searchInputRef.current.select();
+        }
+      }, 150);
     }
   }, [isModalOpen]);
 
@@ -73,6 +80,8 @@ export default function ItemAutocomplete({
   }, [value, selectedItem]);
 
   const handleInputClick = () => {
+    setSearchTerm(''); // Clear search term when opening
+    setSelectedIndex(-1); // Reset selection
     setIsModalOpen(true);
   };
 
@@ -207,6 +216,7 @@ export default function ItemAutocomplete({
                 <div className="relative">
                   <input
                     ref={searchInputRef}
+                    key={isModalOpen ? 'open' : 'closed'} // Force re-render when modal opens
                     type="text"
                     value={searchTerm}
                     onChange={handleSearchChange}
