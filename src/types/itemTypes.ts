@@ -464,7 +464,7 @@ export const ITEM_TYPES: ItemType[] = [
   // Basalt Items
   {
     id: 'basalt_rank_one',
-    name: 'Basalt (Rank One)',
+    name: '1 ⭐ Basalt',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: 'Rank One Basalt for gear enhancement',
     utilityScore: 6,
@@ -472,7 +472,7 @@ export const ITEM_TYPES: ItemType[] = [
   },
   {
     id: 'basalt_rank_two',
-    name: 'Basalt (Rank Two)',
+    name: '2 ⭐ Basalt',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: 'Rank Two Basalt for gear enhancement',
     utilityScore: 7,
@@ -480,7 +480,7 @@ export const ITEM_TYPES: ItemType[] = [
   },
   {
     id: 'basalt_rank_three',
-    name: 'Basalt (Rank Three)',
+    name: '3 ⭐ Basalt',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: 'Rank Three Basalt for gear enhancement',
     utilityScore: 8,
@@ -488,7 +488,7 @@ export const ITEM_TYPES: ItemType[] = [
   },
   {
     id: 'basalt_rank_four',
-    name: 'Basalt (Rank Four)',
+    name: '4 ⭐ Basalt',
     category: ITEM_CATEGORIES.GEAR_ASCENSION,
     description: 'Rank Four Basalt for gear enhancement',
     utilityScore: 9,
