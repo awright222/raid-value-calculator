@@ -43,16 +43,12 @@ let lastCacheTime: number = 0;
 const CACHE_DURATION_MS = 30000; // 30 seconds
 
 // Function to clear the cache when needed
-export const clearPricingCache = () => {
+export function clearPricingCache() {
   pricingCache = null;
   lastCacheTime = 0;
-  console.log('🗑️ Pricing cache cleared');
-};
+}
 
 export const calculateItemPrices = async (): Promise<Record<string, number>> => {
-  console.log('� PricingService v1.2.3 - Starting calculateItemPrices() with enhanced debugging');
-  console.log('🎯 FOCUSED: Looking specifically for chest pack processing issues');
-  
   try {
     // Force refresh by clearing cache
     pricingCache = null;

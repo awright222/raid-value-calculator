@@ -3,10 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { trackVideoEvent } from '../firebase/videoAnalytics';
 
-// Test if import is working
-console.log('[VIDEO ANALYTICS] DemoModal loaded, trackVideoEvent function:', typeof trackVideoEvent);
-console.warn('[VIDEO ANALYTICS] DemoModal loaded, trackVideoEvent function:', typeof trackVideoEvent);
-
 interface DemoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -139,8 +135,8 @@ export const DemoModal: React.FC<DemoModalProps> = ({ isOpen, onClose }) => {
                   onSeeked={handleVideoSeek}
                   onEnded={handleVideoEnded}
                 >
-                  <source src="/RaidPackValueCalcDemo.mov" type="video/mp4" />
-                  <source src="/RaidPackValueCalcDemo.mp4" type="video/mp4" />
+                  <source src="/RaidPackValDemoVid.mov" type="video/mp4" />
+                  <source src="/RaidPackValDemoVid.mp4" type="video/mp4" />
                   Your browser doesn't support video playback.
                 </video>
               </div>

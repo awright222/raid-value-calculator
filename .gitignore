@@ -51,6 +51,8 @@ firestore-debug.log
 # Large video files (hosted on Firebase)
 public/*.mov
 public/*.mp4
+# Allow specific demo video
+!public/RaidPackValDemoVid.mov
 
 # Firebase cache
 .firebase/fix-existing-packs.js

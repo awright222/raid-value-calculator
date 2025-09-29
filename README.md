@@ -2,7 +2,7 @@
 
 **An intelligent pack value analyzer for Raid: Shadow Legends players**
 
-[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Visit_App-blue)](https://your-domain.com)
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Visit_App-blue)](https://raid-value-calculator.web.app)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## ✨ Features
@@ -14,10 +14,19 @@
 - **Confidence Indicators**: See how reliable each price estimate is
 
 ### 📊 **Market Intelligence**
-- **Historical Trends**: Track how pack values change over time
-- **Community Insights**: See what packs other players are analyzing
-- **Best Deals Finder**: Discover the highest-value packs currently available
-- **Pack Evolution**: Track how specific pack types change over time
+- **Market Trends**: Interactive flip cards showing real market data for 42+ items
+- **Item Values Dashboard**: Comprehensive pricing for 67 tracked items with confidence indicators
+- **Historical Price Tracking**: See how item values change over time
+- **Best Deals Analysis**: AI-powered recommendations for highest-value packs
+- **Community Data**: Pricing based on 200+ pack submissions from real players
+- **Smart Filtering**: Filter by item category and view utility-adjusted pricing
+
+### 🎮 **Enhanced User Experience**
+- **Interactive Demo Video**: Watch app features in action
+- **Tab Persistence**: Your selected tab persists across sessions  
+- **Smart Search**: Advanced autocomplete with focus management
+- **Responsive Cards**: Beautiful flip animations and smooth transitions
+- **Real-time Calculations**: Instant analysis as you type
 
 ### 🔒 **Privacy & Security**
 - **GDPR/CCPA Compliant**: Full privacy controls and transparent data collection
@@ -34,10 +43,12 @@
 ## 🚀 Quick Start
 
 ### For Users
-1. Visit the [live application](https://your-domain.com)
-2. Enter pack details (items and price)
-3. Get instant value analysis and grade
-4. Compare with similar packs in the database
+1. Visit the [live application](https://raid-value-calculator.web.app)
+2. Watch the demo video to see all features
+3. Enter pack details (items and price) in the Pack Analyzer
+4. View Market Trends for real-time item pricing data
+5. Check Item Values for comprehensive market analysis
+6. Get instant value analysis and grades
 
 ### For Developers
 ```bash
@@ -58,19 +69,28 @@ npm run build
 ## 🛠️ Technology Stack
 
 - **Frontend**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS + Framer Motion
-- **Database**: Firebase Firestore
-- **Analytics**: Privacy-compliant custom solution
+- **Styling**: Tailwind CSS + Framer Motion animations
+- **Database**: Firebase Firestore with real-time sync
+- **Analytics**: Privacy-compliant custom solution with video tracking
 - **Authentication**: WebAuthn (Touch ID/Face ID) + Firebase Auth
-- **Deployment**: Optimized for Vercel/Netlify
+- **Deployment**: Firebase Hosting with automatic builds
+- **Items Tracked**: 67 unique item types including new ascension potions
 
 ## 📈 How It Works
 
-### 1. **Dynamic Pricing Algorithm**
-- Analyzes thousands of pack submissions from the community
-- Uses advanced algorithms to determine fair market value for each item
+### 1. **Advanced Pricing Algorithm**
+- Analyzes 200+ pack submissions from the community
+- Dynamic item discovery through iterative deduction
+- Special handling for complex items (Magnificent Artifact Chests, etc.)
+- Smart baseline pricing using single-item reference packs
 - Accounts for pack composition, rarity, and market demand
-- Continuously updates based on new data
+- Real-time updates with Firebase integration
+
+### 2. **Multi-Tab Analysis System**
+- **Pack Analyzer**: Individual pack value analysis with grading
+- **Market Trends**: Interactive market data for 42 items with real pricing
+- **Item Values**: Comprehensive dashboard showing 42 of 67 tracked items
+- **Best Deals**: AI-powered recommendations with community insights
 
 ### 2. **Value Grading System**
 - **A+**: Exceptional value (top 5% of packs)
@@ -80,11 +100,13 @@ npm run build
 - **D**: Below average value
 - **F**: Poor value (avoid)
 
-### 3. **Community Data**
-- All pricing is based on real pack submissions
-- No theoretical or inflated values
-- Transparent confidence indicators show data reliability
-- Regular market updates ensure accuracy
+### 3. **Comprehensive Item Database**
+- **67 Tracked Items**: From energy pots to mythical skill tomes
+- **Smart Categories**: Energy, Currency, Leveling, Ranking, Ascension, etc.
+- **New Item Types**: Lesser/Greater ascension potions for all affinities
+- **Consistent Naming**: Star-based format (1⭐ Basalt, 2⭐ Basalt, etc.)
+- **Utility Scoring**: Gameplay utility factors into value calculations
+- **Real Market Data**: Pricing based on actual community submissions
 
 ## 🤝 Contributing
 

@@ -14,6 +14,7 @@ interface ItemValue {
   utilityAdjustedPrice: number;
   utilityScore: number;
   totalQuantity: number;
+  hasData?: boolean; // Track if item has actual pricing data
 }
 
 export default function ItemValues() {
@@ -42,7 +43,7 @@ export default function ItemValues() {
       const { itemStats, totalPacks } = await calculateItemPricesWithStats();
       setTotalPacks(totalPacks);
 
-      // Convert to ItemValue array
+      // Convert to ItemValue array - only include items that have actual data
       const values: ItemValue[] = Object.entries(itemStats).map(([itemTypeId, stats]) => {
         const itemType = getItemTypeById(itemTypeId);
         const rawPrice = stats.totalQuantity > 0 ? stats.totalCost / stats.totalQuantity : 0;
@@ -61,7 +62,8 @@ export default function ItemValues() {
           averagePrice,
           utilityAdjustedPrice,
           utilityScore,
-          totalQuantity: stats.totalQuantity
+          totalQuantity: stats.totalQuantity,
+          hasData: true
         };
       }).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
@@ -189,7 +191,7 @@ export default function ItemValues() {
           <div>
             <h2 className="text-2xl font-bold text-secondary-800 dark:text-gray-200 mb-2">📊 Item Values</h2>
             <p className="text-secondary-600 dark:text-gray-400">
-              Average prices based on {totalPacks} pack{totalPacks !== 1 ? 's' : ''}
+              Average prices based on {totalPacks} pack{totalPacks !== 1 ? 's' : ''} • {itemValues.length} of {ITEM_TYPES.length} items with data
               <span className="ml-2 text-xs text-secondary-500 dark:text-gray-500">
                 Updated: {lastUpdated.toLocaleTimeString()}
               </span>
@@ -286,6 +288,7 @@ export default function ItemValues() {
                   {(() => {
                     const itemType = getItemTypeById(item.itemTypeId);
                     const { unit } = getCurrencyScaling(itemType);
+                    
                     return (
                       <>
                         <div className="text-2xl font-bold text-primary-600">
